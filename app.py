@@ -1426,885 +1426,229 @@ def create_graph_image(
     return graph_buffer
 
 
-# =========================================================
-# PDF GENERATION
-# =========================================================
-
 def create_dashboard_pdf(
-
     filtered_df,
-
     matching_student_ids,
-
     average_cgpa,
-
     total_students,
-
     course_registrations,
-
     backlogs,
-
     students_with_backlogs,
-
     passed,
-
     failed,
-
     detained,
-
     average_semester_cgpa
-
 ):
 
     pdf_buffer = BytesIO()
 
-
     doc = SimpleDocTemplate(
-
         pdf_buffer,
-
         pagesize=A4,
-
         rightMargin=30,
-
         leftMargin=30,
-
         topMargin=30,
-
         bottomMargin=30
-
     )
-
 
     styles = getSampleStyleSheet()
 
-
-    # -----------------------------------------------------
-    # PDF STYLES
-    # -----------------------------------------------------
-
     title_style = ParagraphStyle(
-
         "PDFTitle",
-
         parent=styles["Title"],
-
-        fontSize=21,
-
-        leading=25,
-
+        fontSize=20,
+        leading=24,
         alignment=TA_CENTER,
-
-        textColor=colors.HexColor(
-            "#8B0000"
-        ),
-
+        textColor=colors.HexColor("#1565C0"),
         spaceAfter=5
-
     )
-
 
     department_style = ParagraphStyle(
-
         "Department",
-
         parent=styles["Heading2"],
-
-        fontSize=16,
-
-        leading=20,
-
+        fontSize=15,
+        leading=19,
         alignment=TA_CENTER,
-
-        textColor=colors.HexColor(
-            "#1565C0"
-        ),
-
+        textColor=colors.HexColor("#1565C0"),
         spaceAfter=5
-
     )
-
 
     subtitle_style = ParagraphStyle(
-
         "Subtitle",
-
         parent=styles["Normal"],
-
         fontSize=10,
-
         leading=14,
-
         alignment=TA_CENTER,
-
-        textColor=colors.HexColor(
-            "#555555"
-        ),
-
+        textColor=colors.HexColor("#555555"),
         spaceAfter=12
-
     )
-
 
     heading_style = ParagraphStyle(
-
         "PDFHeading",
-
         parent=styles["Heading2"],
-
         fontSize=14,
-
         leading=18,
-
-        textColor=colors.HexColor(
-            "#1565C0"
-        ),
-
+        textColor=colors.HexColor("#1565C0"),
         spaceBefore=12,
-
         spaceAfter=8
-
     )
 
-
-    small_style = ParagraphStyle(
-
-        "Small",
-
+    normal_style = ParagraphStyle(
+        "NormalPDF",
         parent=styles["Normal"],
-
-        fontSize=8,
-
-        leading=10
-
+        fontSize=9,
+        leading=12
     )
-
 
     story = []
 
-
     # =====================================================
-    # KLU IMAGE
+    # KLU LOGO
     # =====================================================
 
     if LOGO_PATH.exists():
 
         logo = Image(
             str(LOGO_PATH),
-            width=7.0 * inch,
-            height=(
-                7.0 * 183 / 940
-            ) * inch
+            width=5.5 * inch,
+            height=(5.5 * 183 / 940) * inch
         )
 
         logo.hAlign = "CENTER"
 
         story.append(logo)
-
-        story.append(
-            Spacer(1, 8)
-        )
-
-    else:
-
-        story.append(
-            Paragraph(
-                "KL UNIVERSITY",
-                title_style
-            )
-        )
-
-        story.append(
-            Paragraph(
-                "KLU Logo not found",
-                subtitle_style
-            )
-        )
+        story.append(Spacer(1, 8))
 
     # =====================================================
     # HEADER
     # =====================================================
 
     story.append(
-
         Paragraph(
             "KL UNIVERSITY",
             title_style
         )
-
     )
 
-
     story.append(
-
         Paragraph(
             "Department of CSE-4",
             department_style
         )
-
     )
 
-
     story.append(
-
         Paragraph(
-            "Academic Performance Dashboard",
+            "Student Academic Performance Report",
             subtitle_style
         )
-
     )
-
-
-    # Header line
 
     header_line = Table(
-
         [[""]],
-
-        colWidths=[
-            7.0 * inch
-        ],
-
+        colWidths=[7.0 * inch],
         rowHeights=[4]
-
     )
-
 
     header_line.setStyle(
-
         TableStyle([
-
             (
                 "BACKGROUND",
                 (0, 0),
                 (-1, -1),
-                colors.HexColor(
-                    "#1565C0"
-                )
+                colors.HexColor("#1565C0")
             )
-
         ])
-
     )
 
-
-    story.append(
-        header_line
-    )
-
-    story.append(
-        Spacer(1, 12)
-    )
-
+    story.append(header_line)
+    story.append(Spacer(1, 15))
 
     # =====================================================
-    # FILTER INFORMATION
+    # NO STUDENT SELECTED
     # =====================================================
 
-    story.append(
-
-        Paragraph(
-            "Applied Dashboard Filters",
-            heading_style
-        )
-
-    )
-
-
-    filter_data = [
-
-        [
-            "Filter",
-            "Selected Value"
-        ],
-
-        [
-            "Year",
-
-            ", ".join(
-                selected_year
-            )
-            if selected_year
-            else "All"
-        ],
-
-        [
-            "Course Code",
-
-            ", ".join(
-                selected_course_code
-            )
-            if selected_course_code
-            else "All"
-        ],
-
-        [
-            "Course Name",
-
-            ", ".join(
-                selected_course_name
-            )
-            if selected_course_name
-            else "All"
-        ],
-
-        [
-            "Semester",
-            selected_semester
-        ]
-
-    ]
-
-
-    filter_table = Table(
-
-        filter_data,
-
-        colWidths=[
-            1.8 * inch,
-            5.2 * inch
-        ]
-
-    )
-
-
-    filter_table.setStyle(
-
-        TableStyle([
-
-            (
-                "BACKGROUND",
-                (0, 0),
-                (-1, 0),
-                colors.HexColor(
-                    "#1565C0"
-                )
-            ),
-
-            (
-                "TEXTCOLOR",
-                (0, 0),
-                (-1, 0),
-                colors.white
-            ),
-
-            (
-                "FONTNAME",
-                (0, 0),
-                (-1, 0),
-                "Helvetica-Bold"
-            ),
-
-            (
-                "GRID",
-                (0, 0),
-                (-1, -1),
-                0.5,
-                colors.grey
-            ),
-
-            (
-                "ROWBACKGROUNDS",
-                (0, 1),
-                (-1, -1),
-                [
-                    colors.white,
-                    colors.HexColor(
-                        "#F5F9FF"
-                    )
-                ]
-            ),
-
-            (
-                "PADDING",
-                (0, 0),
-                (-1, -1),
-                6
-            )
-
-        ])
-
-    )
-
-
-    story.append(
-        filter_table
-    )
-
-
-    # =====================================================
-    # DASHBOARD OVERVIEW
-    # =====================================================
-
-    story.append(
-
-        Paragraph(
-            "Dashboard Overview",
-            heading_style
-        )
-
-    )
-
-
-    kpi_data = [
-
-        [
-            "Total Students",
-            "Average CGPA",
-            "Course Registrations"
-        ],
-
-        [
-            str(total_students),
-            f"{average_cgpa:.2f} / 10",
-            str(course_registrations)
-        ],
-
-        [
-            "Backlogs",
-            "Students With Backlogs",
-            "Passed"
-        ],
-
-        [
-            str(backlogs),
-            str(students_with_backlogs),
-            str(passed)
-        ],
-
-        [
-            "Failed",
-            "Detained",
-            ""
-        ],
-
-        [
-            str(failed),
-            str(detained),
-            ""
-        ]
-
-    ]
-
-
-    kpi_table = Table(
-
-        kpi_data,
-
-        colWidths=[
-            2.33 * inch,
-            2.33 * inch,
-            2.33 * inch
-        ]
-
-    )
-
-
-    kpi_table.setStyle(
-
-        TableStyle([
-
-            (
-                "BACKGROUND",
-                (0, 0),
-                (-1, 0),
-                colors.HexColor(
-                    "#1565C0"
-                )
-            ),
-
-            (
-                "BACKGROUND",
-                (0, 2),
-                (-1, 2),
-                colors.HexColor(
-                    "#1976D2"
-                )
-            ),
-
-            (
-                "BACKGROUND",
-                (0, 4),
-                (-1, 4),
-                colors.HexColor(
-                    "#1976D2"
-                )
-            ),
-
-            (
-                "TEXTCOLOR",
-                (0, 0),
-                (-1, -1),
-                colors.white
-            ),
-
-            (
-                "FONTNAME",
-                (0, 0),
-                (-1, -1),
-                "Helvetica-Bold"
-            ),
-
-            (
-                "ALIGN",
-                (0, 0),
-                (-1, -1),
-                "CENTER"
-            ),
-
-            (
-                "GRID",
-                (0, 0),
-                (-1, -1),
-                0.5,
-                colors.white
-            ),
-
-            (
-                "PADDING",
-                (0, 0),
-                (-1, -1),
-                8
-            )
-
-        ])
-
-    )
-
-
-    story.append(
-        kpi_table
-    )
-
-
-    # =====================================================
-    # LEGEND
-    # =====================================================
-
-    story.append(
-        Spacer(1, 10)
-    )
-
-
-    story.append(
-
-        Paragraph(
-
-            "<b>Legend:</b> "
-            "CGPA is out of 10.0 | "
-            "<b>P</b> = Passed | "
-            "<b>F</b> = Failed / Backlog | "
-            "<b>DT</b> = Detained",
-
-            styles["Normal"]
-
-        )
-
-    )
-
-
-    # =====================================================
-    # STUDENT SUMMARY
-    # =====================================================
-
-    if matching_student_ids:
+    if not matching_student_ids:
 
         story.append(
-
             Paragraph(
-                "Student Summary",
+                "No student selected.",
                 heading_style
             )
-
         )
-
-
-        student_summary = []
-
-
-        for student_id in (
-            matching_student_ids
-        ):
-
-            student_data = df[
-                df["ID Number"] ==
-                student_id
-            ]
-
-
-            if student_data.empty:
-
-                continue
-
-
-            student_name = (
-                student_data[
-                    "Name"
-                ].iloc[0]
-            )
-
-
-            cgpa = calculate_cgpa(
-                student_data
-            )
-
-
-            student_results = (
-                student_data[
-                    "Grade"
-                ].apply(get_result)
-            )
-
-
-            student_backlogs = (
-                student_results == "F"
-            ).sum()
-
-
-            student_summary.append([
-
-                str(student_id),
-
-                str(student_name),
-
-                f"{cgpa:.2f}",
-
-                str(
-                    len(student_data)
-                ),
-
-                str(
-                    student_backlogs
-                )
-
-            ])
-
-
-        if student_summary:
-
-            summary_data = [
-
-                [
-                    "Student ID",
-                    "Name",
-                    "CGPA",
-                    "Courses",
-                    "Backlogs"
-                ]
-
-            ] + student_summary
-
-
-            summary_table = Table(
-
-                summary_data,
-
-                repeatRows=1,
-
-                colWidths=[
-
-                    1.2 * inch,
-
-                    2.5 * inch,
-
-                    0.8 * inch,
-
-                    0.8 * inch,
-
-                    0.9 * inch
-
-                ]
-
-            )
-
-
-            summary_table.setStyle(
-
-                TableStyle([
-
-                    (
-                        "BACKGROUND",
-                        (0, 0),
-                        (-1, 0),
-                        colors.HexColor(
-                            "#1565C0"
-                        )
-                    ),
-
-                    (
-                        "TEXTCOLOR",
-                        (0, 0),
-                        (-1, 0),
-                        colors.white
-                    ),
-
-                    (
-                        "FONTNAME",
-                        (0, 0),
-                        (-1, 0),
-                        "Helvetica-Bold"
-                    ),
-
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.grey
-                    ),
-
-                    (
-                        "ROWBACKGROUNDS",
-                        (0, 1),
-                        (-1, -1),
-                        [
-                            colors.white,
-                            colors.HexColor(
-                                "#F5F9FF"
-                            )
-                        ]
-                    ),
-
-                    (
-                        "ALIGN",
-                        (2, 1),
-                        (-1, -1),
-                        "CENTER"
-                    ),
-
-                    (
-                        "FONTSIZE",
-                        (0, 0),
-                        (-1, -1),
-                        8
-                    ),
-
-                    (
-                        "PADDING",
-                        (0, 0),
-                        (-1, -1),
-                        5
-                    )
-
-                ])
-
-            )
-
-
-            story.append(
-                summary_table
-            )
-
-
-    # =====================================================
-    # CGPA GRAPH
-    # =====================================================
-
-    if (
-        average_semester_cgpa
-        is not None
-        and not average_semester_cgpa.empty
-    ):
 
         story.append(
-
             Paragraph(
-                "Average CGPA by Semester",
+                "Please search for a student before generating the PDF.",
+                normal_style
+            )
+        )
+
+        doc.build(story)
+
+        pdf_buffer.seek(0)
+
+        return pdf_buffer
+
+    # =====================================================
+    # STUDENT DETAILS
+    # =====================================================
+
+    for student_id in matching_student_ids:
+
+        student_data = df[
+            df["ID Number"] == student_id
+        ].copy()
+
+        if student_data.empty:
+            continue
+
+        student_name = str(
+            student_data["Name"].iloc[0]
+        )
+
+        overall_cgpa = calculate_cgpa(
+            student_data
+        )
+
+        # =================================================
+        # STUDENT INFORMATION
+        # =================================================
+
+        story.append(
+            Paragraph(
+                "Student Details",
                 heading_style
             )
-
         )
 
-
-        graph_buffer = (
-            create_graph_image(
-                average_semester_cgpa
-            )
-        )
-
-
-        if graph_buffer:
-
-            graph_image = Image(
-
-                graph_buffer,
-
-                width=6.8 * inch,
-
-                height=3.4 * inch
-
-            )
-
-            graph_image.hAlign = "CENTER"
-
-            story.append(
-                graph_image
-            )
-
-
-        # Graph values
-
-        graph_values = [
-
-            [
-                "Semester",
-                "Average CGPA"
-            ]
-
+        student_info = [
+            ["Student ID", str(student_id)],
+            ["Student Name", student_name],
+            ["Overall CGPA", f"{overall_cgpa:.2f} / 10"],
         ]
 
-
-        for _, row in (
-            average_semester_cgpa.iterrows()
-        ):
-
-            graph_values.append([
-
-                str(
-                    row["Semester"]
-                ),
-
-                f"{row['CGPA']:.2f}"
-
-            ])
-
-
-        graph_table = Table(
-
-            graph_values,
-
+        student_info_table = Table(
+            student_info,
             colWidths=[
-                3.5 * inch,
-                3.5 * inch
+                1.7 * inch,
+                5.3 * inch
             ]
-
         )
 
-
-        graph_table.setStyle(
-
+        student_info_table.setStyle(
             TableStyle([
-
                 (
                     "BACKGROUND",
                     (0, 0),
-                    (-1, 0),
-                    colors.HexColor(
-                        "#1565C0"
-                    )
-                ),
-
-                (
-                    "TEXTCOLOR",
-                    (0, 0),
-                    (-1, 0),
-                    colors.white
+                    (0, -1),
+                    colors.HexColor("#E3F2FD")
                 ),
 
                 (
                     "FONTNAME",
                     (0, 0),
-                    (-1, 0),
+                    (0, -1),
                     "Helvetica-Bold"
                 ),
 
@@ -2317,508 +1661,108 @@ def create_dashboard_pdf(
                 ),
 
                 (
-                    "ALIGN",
-                    (1, 1),
-                    (1, -1),
-                    "CENTER"
-                ),
-
-                (
                     "PADDING",
                     (0, 0),
                     (-1, -1),
-                    5
-                )
+                    7
+                ),
 
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE"
+                )
             ])
-
-        )
-
-
-        story.append(
-            Spacer(1, 8)
         )
 
         story.append(
-            graph_table
+            student_info_table
         )
 
+        story.append(Spacer(1, 10))
 
-    # =====================================================
-    # SELECTED STUDENT COURSE DETAILS
-    # =====================================================
+        # =================================================
+        # ACADEMIC PERFORMANCE
+        # =================================================
 
-    if len(matching_student_ids) == 1:
-
-        selected_id = (
-            matching_student_ids[0]
+        story.append(
+            Paragraph(
+                "Academic Performance",
+                heading_style
+            )
         )
 
-        student_data = df[
-            df["ID Number"] ==
-            selected_id
-        ].copy()
-
-
-        if not student_data.empty:
-
-            story.append(
-                PageBreak()
-            )
-
-
-            student_name = (
-                student_data[
-                    "Name"
-                ].iloc[0]
-            )
-
-
-            story.append(
-
-                Paragraph(
-
-                    f"Student Academic Details - "
-                    f"{student_name}",
-
-                    heading_style
-
-                )
-
-            )
-
-
-            detail_columns = [
-
+        detail_data = [
+            [
                 "Semester",
                 "Course Code",
                 "Course Name",
                 "Grade",
                 "Points",
-                "Credits"
-
+                "Credits",
+                "Result"
             ]
+        ]
 
+        # Sort by semester
+        student_data = student_data.copy()
 
-            detail_data = [
-
-                detail_columns
-
-            ]
-
-
-            for _, row in (
-                student_data.iterrows()
-            ):
-
-                detail_data.append([
-
-                    str(
-                        row["Semester"]
-                    ),
-
-                    str(
-                        row["Course Code"]
-                    ),
-
-                    str(
-                        row["Course Name"]
-                    ),
-
-                    str(
-                        row["Grade"]
-                    ),
-
-                    str(
-                        row["Points"]
-                    )
-                    if pd.notna(
-                        row["Points"]
-                    )
-                    else "",
-
-                    str(
-                        row["Credits"]
-                    )
-                    if pd.notna(
-                        row["Credits"]
-                    )
-                    else ""
-
-                ])
-
-
-            detail_table = Table(
-
-                detail_data,
-
-                repeatRows=1,
-
-                colWidths=[
-
-                    0.8 * inch,
-
-                    1.0 * inch,
-
-                    2.7 * inch,
-
-                    0.7 * inch,
-
-                    0.7 * inch,
-
-                    0.7 * inch
-
-                ]
-
-            )
-
-
-            detail_table.setStyle(
-
-                TableStyle([
-
-                    (
-                        "BACKGROUND",
-                        (0, 0),
-                        (-1, 0),
-                        colors.HexColor(
-                            "#1565C0"
-                        )
-                    ),
-
-                    (
-                        "TEXTCOLOR",
-                        (0, 0),
-                        (-1, 0),
-                        colors.white
-                    ),
-
-                    (
-                        "FONTNAME",
-                        (0, 0),
-                        (-1, 0),
-                        "Helvetica-Bold"
-                    ),
-
-                    (
-                        "FONTSIZE",
-                        (0, 0),
-                        (-1, -1),
-                        7
-                    ),
-
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.3,
-                        colors.grey
-                    ),
-
-                    (
-                        "ROWBACKGROUNDS",
-                        (0, 1),
-                        (-1, -1),
-                        [
-                            colors.white,
-                            colors.HexColor(
-                                "#F5F9FF"
-                            )
-                        ]
-                    ),
-
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "MIDDLE"
-                    ),
-
-                    (
-                        "PADDING",
-                        (0, 0),
-                        (-1, -1),
-                        4
-                    )
-
-                ])
-
-            )
-
-
-            story.append(
-                detail_table
-            )
-
-
-            # -------------------------------------------------
-            # BACKLOGS
-            # -------------------------------------------------
-
-            backlog_data = student_data[
-                student_data[
-                    "Grade"
-                ]
-                .apply(get_result) == "F"
-            ]
-
-
-            story.append(
-
-                Paragraph(
-                    "Backlog Subjects",
-                    heading_style
-                )
-
-            )
-
-
-            if backlog_data.empty:
-
-                story.append(
-
-                    Paragraph(
-                        "No Backlogs",
-                        styles["Normal"]
-                    )
-
-                )
-
-            else:
-
-                backlog_table_data = [
-
-                    [
-                        "Course Code",
-                        "Course Name",
-                        "Grade",
-                        "Points",
-                        "Semester"
-                    ]
-
-                ]
-
-
-                for _, row in (
-                    backlog_data.iterrows()
-                ):
-
-                    backlog_table_data.append([
-
-                        str(
-                            row["Course Code"]
-                        ),
-
-                        str(
-                            row["Course Name"]
-                        ),
-
-                        str(
-                            row["Grade"]
-                        ),
-
-                        str(
-                            row["Points"]
-                        ),
-
-                        str(
-                            row["Semester"]
-                        )
-
-                    ])
-
-
-                backlog_table = Table(
-
-                    backlog_table_data,
-
-                    repeatRows=1,
-
-                    colWidths=[
-
-                        1.0 * inch,
-
-                        3.0 * inch,
-
-                        0.7 * inch,
-
-                        0.7 * inch,
-
-                        1.3 * inch
-
-                    ]
-
-                )
-
-
-                backlog_table.setStyle(
-
-                    TableStyle([
-
-                        (
-                            "BACKGROUND",
-                            (0, 0),
-                            (-1, 0),
-                            colors.HexColor(
-                                "#C62828"
-                            )
-                        ),
-
-                        (
-                            "TEXTCOLOR",
-                            (0, 0),
-                            (-1, 0),
-                            colors.white
-                        ),
-
-                        (
-                            "FONTNAME",
-                            (0, 0),
-                            (-1, 0),
-                            "Helvetica-Bold"
-                        ),
-
-                        (
-                            "GRID",
-                            (0, 0),
-                            (-1, -1),
-                            0.5,
-                            colors.grey
-                        ),
-
-                        (
-                            "ROWBACKGROUNDS",
-                            (0, 1),
-                            (-1, -1),
-                            [
-                                colors.white,
-                                colors.HexColor(
-                                    "#FFF5F5"
-                                )
-                            ]
-                        ),
-
-                        (
-                            "FONTSIZE",
-                            (0, 0),
-                            (-1, -1),
-                            8
-                        ),
-
-                        (
-                            "PADDING",
-                            (0, 0),
-                            (-1, -1),
-                            5
-                        )
-
-                    ])
-
-                )
-
-
-                story.append(
-                    backlog_table
-                )
-
-
-    # =====================================================
-    # FILTERED ACADEMIC RECORDS
-    # =====================================================
-
-    story.append(
-        PageBreak()
-    )
-
-
-    story.append(
-
-        Paragraph(
-            "Filtered Academic Records",
-            heading_style
+        student_data["_sort"] = (
+            student_data["Semester"]
+            .apply(semester_sort_key)
         )
 
-    )
+        student_data = student_data.sort_values(
+            "_sort"
+        )
 
+        for _, row in student_data.iterrows():
 
-    if not filtered_df.empty:
+            result = get_result(
+                row["Grade"]
+            )
 
-        pdf_columns = [
-
-            "ID Number",
-            "Name",
-            "Course Code",
-            "Course Name",
-            "Grade",
-            "Points",
-            "Credits",
-            "Year",
-            "Semester"
-
-        ]
-
-
-        pdf_columns = [
-
-            col
-            for col in pdf_columns
-            if col in filtered_df.columns
-
-        ]
-
-
-        records = [
-
-            pdf_columns
-
-        ]
-
-
-        for _, row in (
-            filtered_df.iterrows()
-        ):
-
-            records.append([
-
-                str(
-                    row[col]
-                )
-                if pd.notna(
-                    row[col]
-                )
-                else ""
-
-                for col in pdf_columns
-
+            detail_data.append([
+                str(row["Semester"]),
+                str(row["Course Code"]),
+                str(row["Course Name"]),
+                str(row["Grade"]),
+                (
+                    f"{row['Points']:.2f}"
+                    if pd.notna(row["Points"])
+                    else ""
+                ),
+                (
+                    f"{row['Credits']:.1f}"
+                    if pd.notna(row["Credits"])
+                    else ""
+                ),
+                result
             ])
 
-
-        # Avoid an extremely large PDF
-        # while retaining the dashboard data.
-
-        records = records[:1001]
-
-
-        record_table = Table(
-
-            records,
-
-            repeatRows=1
-
+        detail_table = Table(
+            detail_data,
+            repeatRows=1,
+            colWidths=[
+                0.75 * inch,
+                0.85 * inch,
+                2.55 * inch,
+                0.55 * inch,
+                0.65 * inch,
+                0.60 * inch,
+                0.70 * inch
+            ]
         )
 
-
-        record_table.setStyle(
-
+        detail_table.setStyle(
             TableStyle([
 
                 (
                     "BACKGROUND",
                     (0, 0),
                     (-1, 0),
-                    colors.HexColor(
-                        "#1565C0"
-                    )
+                    colors.HexColor("#1565C0")
                 ),
 
                 (
@@ -2839,14 +1783,14 @@ def create_dashboard_pdf(
                     "FONTSIZE",
                     (0, 0),
                     (-1, -1),
-                    6
+                    7
                 ),
 
                 (
                     "GRID",
                     (0, 0),
                     (-1, -1),
-                    0.3,
+                    0.4,
                     colors.grey
                 ),
 
@@ -2856,10 +1800,15 @@ def create_dashboard_pdf(
                     (-1, -1),
                     [
                         colors.white,
-                        colors.HexColor(
-                            "#F5F9FF"
-                        )
+                        colors.HexColor("#F5F9FF")
                     ]
+                ),
+
+                (
+                    "ALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "CENTER"
                 ),
 
                 (
@@ -2873,30 +1822,257 @@ def create_dashboard_pdf(
                     "PADDING",
                     (0, 0),
                     (-1, -1),
-                    3
+                    4
                 )
-
             ])
-
         )
 
-
         story.append(
-            record_table
+            detail_table
         )
 
-
-    else:
+        # =================================================
+        # SEMESTER-WISE CGPA
+        # =================================================
 
         story.append(
-
             Paragraph(
-                "No academic records available.",
-                styles["Normal"]
+                "Semester-wise Academic Performance",
+                heading_style
+            )
+        )
+
+        semester_data = []
+
+        for semester, sem_df in (
+            student_data.groupby("Semester")
+        ):
+
+            semester_cgpa = calculate_cgpa(
+                sem_df
             )
 
+            semester_data.append([
+                str(semester),
+                f"{semester_cgpa:.2f} / 10",
+                str(len(sem_df))
+            ])
+
+        semester_data.sort(
+            key=lambda x: semester_sort_key(x[0])
         )
 
+        semester_table_data = [
+            [
+                "Semester",
+                "Semester CGPA",
+                "Courses"
+            ]
+        ] + semester_data
+
+        semester_table = Table(
+            semester_table_data,
+            repeatRows=1,
+            colWidths=[
+                2.2 * inch,
+                2.4 * inch,
+                2.4 * inch
+            ]
+        )
+
+        semester_table.setStyle(
+            TableStyle([
+
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, 0),
+                    colors.HexColor("#1976D2")
+                ),
+
+                (
+                    "TEXTCOLOR",
+                    (0, 0),
+                    (-1, 0),
+                    colors.white
+                ),
+
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (-1, 0),
+                    "Helvetica-Bold"
+                ),
+
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.4,
+                    colors.grey
+                ),
+
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [
+                        colors.white,
+                        colors.HexColor("#F5F9FF")
+                    ]
+                ),
+
+                (
+                    "ALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "CENTER"
+                ),
+
+                (
+                    "PADDING",
+                    (0, 0),
+                    (-1, -1),
+                    6
+                )
+            ])
+        )
+
+        story.append(
+            semester_table
+        )
+
+        # =================================================
+        # BACKLOG SUBJECTS
+        # =================================================
+
+        story.append(
+            Paragraph(
+                "Backlog Subjects",
+                heading_style
+            )
+        )
+
+        backlog_data = student_data[
+            student_data["Grade"]
+            .apply(get_result) == "F"
+        ]
+
+        if backlog_data.empty:
+
+            story.append(
+                Paragraph(
+                    "No Backlogs",
+                    normal_style
+                )
+            )
+
+        else:
+
+            backlog_table_data = [
+                [
+                    "Course Code",
+                    "Course Name",
+                    "Grade",
+                    "Points",
+                    "Semester"
+                ]
+            ]
+
+            for _, row in backlog_data.iterrows():
+
+                backlog_table_data.append([
+                    str(row["Course Code"]),
+                    str(row["Course Name"]),
+                    str(row["Grade"]),
+                    (
+                        f"{row['Points']:.2f}"
+                        if pd.notna(row["Points"])
+                        else ""
+                    ),
+                    str(row["Semester"])
+                ])
+
+            backlog_table = Table(
+                backlog_table_data,
+                repeatRows=1,
+                colWidths=[
+                    1.0 * inch,
+                    3.0 * inch,
+                    0.7 * inch,
+                    0.8 * inch,
+                    1.5 * inch
+                ]
+            )
+
+            backlog_table.setStyle(
+                TableStyle([
+
+                    (
+                        "BACKGROUND",
+                        (0, 0),
+                        (-1, 0),
+                        colors.HexColor("#C62828")
+                    ),
+
+                    (
+                        "TEXTCOLOR",
+                        (0, 0),
+                        (-1, 0),
+                        colors.white
+                    ),
+
+                    (
+                        "FONTNAME",
+                        (0, 0),
+                        (-1, 0),
+                        "Helvetica-Bold"
+                    ),
+
+                    (
+                        "GRID",
+                        (0, 0),
+                        (-1, -1),
+                        0.4,
+                        colors.grey
+                    ),
+
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [
+                            colors.white,
+                            colors.HexColor("#FFF5F5")
+                        ]
+                    ),
+
+                    (
+                        "FONTSIZE",
+                        (0, 0),
+                        (-1, -1),
+                        8
+                    ),
+
+                    (
+                        "PADDING",
+                        (0, 0),
+                        (-1, -1),
+                        5
+                    )
+                ])
+            )
+
+            story.append(
+                backlog_table
+            )
+
+        # Page break between students
+        if student_id != matching_student_ids[-1]:
+
+            story.append(
+                PageBreak()
+            )
 
     # =====================================================
     # FOOTER
@@ -2906,42 +2082,24 @@ def create_dashboard_pdf(
         Spacer(1, 15)
     )
 
-
     story.append(
-
         Paragraph(
-
             "KL UNIVERSITY | Department of CSE-4",
-
             ParagraphStyle(
-
                 "Footer",
-
                 parent=styles["Normal"],
-
                 fontSize=8,
-
                 alignment=TA_CENTER,
-
-                textColor=colors.HexColor(
-                    "#777777"
-                )
-
+                textColor=colors.HexColor("#777777")
             )
-
         )
-
     )
-
 
     # =====================================================
     # BUILD PDF
     # =====================================================
 
-    doc.build(
-        story
-    )
-
+    doc.build(story)
 
     pdf_buffer.seek(0)
 
@@ -2991,11 +2149,17 @@ st.download_button(
 # =========================================================
 
 if st.button(
-    "📄 Generate Full Dashboard PDF",
+    "📄 Generate Student Academic PDF",
     use_container_width=True
 ):
 
-    if not LOGO_PATH.exists():
+    if not matching_student_ids:
+
+        st.warning(
+            "Please search/select a student first."
+        )
+
+    elif not LOGO_PATH.exists():
 
         st.error(
             "KLU logo not found. "
@@ -3006,7 +2170,7 @@ if st.button(
     else:
 
         with st.spinner(
-            "Generating full dashboard PDF..."
+            "Generating student academic PDF..."
         ):
 
             pdf_file = create_dashboard_pdf(
@@ -3040,17 +2204,17 @@ if st.button(
             )
 
         st.success(
-            "PDF generated successfully! ✅"
+            "Student academic PDF generated successfully! ✅"
         )
 
         st.download_button(
 
-            label="⬇️ Download Full Dashboard PDF",
+            label="⬇️ Download Student Academic PDF",
 
             data=pdf_file,
 
             file_name=(
-                "KL_University_CSE4_Dashboard.pdf"
+                "KL_University_Student_Academic_Report.pdf"
             ),
 
             mime="application/pdf",
