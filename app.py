@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from io import BytesIO
-
+from pathlib import Path
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -19,6 +19,8 @@ from reportlab.platypus import (
     PageBreak
 )
 from reportlab.lib.units import inch
+BASE_DIR = Path(__file__).resolve().parent
+LOGO_PATH = BASE_DIR / "klu_logo.png.jpg"
 
 
 # =========================================================
@@ -1585,18 +1587,14 @@ def create_dashboard_pdf(
     # KLU IMAGE
     # =====================================================
 
-    try:
+    if LOGO_PATH.exists():
 
         logo = Image(
-
-            "klu_logo.png",
-
+            str(LOGO_PATH),
             width=7.0 * inch,
-
             height=(
                 7.0 * 183 / 940
             ) * inch
-
         )
 
         logo.hAlign = "CENTER"
@@ -1607,17 +1605,21 @@ def create_dashboard_pdf(
             Spacer(1, 8)
         )
 
-    except Exception:
+    else:
 
         story.append(
-
             Paragraph(
                 "KL UNIVERSITY",
                 title_style
             )
-
         )
 
+        story.append(
+            Paragraph(
+                "KLU Logo not found",
+                subtitle_style
+            )
+        )
 
     # =====================================================
     # HEADER
