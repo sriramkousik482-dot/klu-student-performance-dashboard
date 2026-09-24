@@ -1747,7 +1747,7 @@ def create_dashboard_pdf(
             colWidths=[
                 0.75 * inch,
                 0.85 * inch,
-                2.55 * inch,
+                3.55 * inch,
                 0.55 * inch,
                 0.65 * inch,
                 0.60 * inch,
