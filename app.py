@@ -2990,47 +2990,71 @@ st.download_button(
 # PDF DOWNLOAD
 # =========================================================
 
-pdf_file = create_dashboard_pdf(
+if st.button(
+    "📄 Generate Full Dashboard PDF",
+    use_container_width=True
+):
 
-    filtered_df=filtered_df,
+    if not LOGO_PATH.exists():
 
-    matching_student_ids=matching_student_ids,
+        st.error(
+            "KLU logo not found. "
+            "Please make sure 'klu_logo.png.jpg' "
+            "is in the same GitHub folder as app.py."
+        )
 
-    average_cgpa=average_cgpa,
+    else:
 
-    total_students=total_students,
+        with st.spinner(
+            "Generating full dashboard PDF..."
+        ):
 
-    course_registrations=course_registrations,
+            pdf_file = create_dashboard_pdf(
 
-    backlogs=backlogs,
+                filtered_df=filtered_df,
 
-    students_with_backlogs=(
-        students_with_backlogs
-    ),
+                matching_student_ids=matching_student_ids,
 
-    passed=passed,
+                average_cgpa=average_cgpa,
 
-    failed=failed,
+                total_students=total_students,
 
-    detained=detained,
+                course_registrations=course_registrations,
 
-    average_semester_cgpa=(
-        average_semester_cgpa
-    )
+                backlogs=backlogs,
 
-)
+                students_with_backlogs=(
+                    students_with_backlogs
+                ),
 
+                passed=passed,
 
-st.download_button(
+                failed=failed,
 
-    label="📄 Download Full Dashboard PDF",
+                detained=detained,
 
-    data=pdf_file,
+                average_semester_cgpa=(
+                    average_semester_cgpa
+                )
 
-    file_name=(
-        "KL_University_CSE4_Dashboard.pdf"
-    ),
+            )
 
-    mime="application/pdf"
+        st.success(
+            "PDF generated successfully! ✅"
+        )
 
-)
+        st.download_button(
+
+            label="⬇️ Download Full Dashboard PDF",
+
+            data=pdf_file,
+
+            file_name=(
+                "KL_University_CSE4_Dashboard.pdf"
+            ),
+
+            mime="application/pdf",
+
+            use_container_width=True
+
+        )
