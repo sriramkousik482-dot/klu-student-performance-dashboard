@@ -74,7 +74,7 @@ def clean_column_name(column):
 
 def find_column(df, possible_names):
 
-    # First: exact match
+    # Exact match
     for possible in possible_names:
 
         for actual in df.columns:
@@ -86,7 +86,7 @@ def find_column(df, possible_names):
 
                 return actual
 
-    # Second: partial match
+    # Partial match
     for possible in possible_names:
 
         possible_clean = clean_column_name(
@@ -281,10 +281,7 @@ def calculate_academic_semester(
             semester_type
         ).strip().lower()
 
-        # -------------------------------------------------
         # Joining Year
-        # -------------------------------------------------
-
         if joining_year.startswith("Y"):
 
             join_year = (
@@ -298,10 +295,7 @@ def calculate_academic_semester(
                 joining_year
             )
 
-        # -------------------------------------------------
         # Academic Year
-        # -------------------------------------------------
-
         academic_start_year = int(
             academic_year.split("-")[0]
         )
@@ -316,18 +310,13 @@ def calculate_academic_semester(
 
             return None
 
-        # -------------------------------------------------
-        # Summer Term
-        # -------------------------------------------------
-
+        # Summer Term should not get
+        # an academic semester number
         if "summer" in semester_type:
 
             return None
 
-        # -------------------------------------------------
         # Odd / Even
-        # -------------------------------------------------
-
         if "odd" in semester_type:
 
             semester_number = "1"
@@ -519,7 +508,6 @@ def load_data():
         .str.upper()
     )
 
-    # Fix pandas string "nan"
     df["Category"] = df["Category"].replace(
         "NAN",
         ""
@@ -1293,11 +1281,9 @@ def generate_pdf(student_data):
     )
 
     semesters = [
-
         semester
         for semester in semesters
         if str(semester).strip() != ""
-
     ]
 
     semesters = sorted(
@@ -1599,12 +1585,8 @@ def generate_pdf(student_data):
 
     marks_data = student_data.copy()
 
-    # -----------------------------------------------------
-    # REMOVE SUMMER TERM
-    # -----------------------------------------------------
-
+    # Remove Summer Term
     marks_data = marks_data[
-
         marks_data[
             "Semester"
         ]
@@ -1612,13 +1594,9 @@ def generate_pdf(student_data):
         .str.strip()
         .str.lower()
         != "summer term"
-
     ].copy()
 
-    # -----------------------------------------------------
-    # REMOVE EMPTY SEMESTERS
-    # -----------------------------------------------------
-
+    # Remove empty academic semesters
     marks_data = marks_data[
         marks_data[
             "Academic Semester"
@@ -1626,20 +1604,15 @@ def generate_pdf(student_data):
     ].copy()
 
     marks_data = marks_data[
-
         marks_data[
             "Academic Semester"
         ]
         .astype(str)
         .str.strip()
         != ""
-
     ].copy()
 
-    # -----------------------------------------------------
-    # SORT
-    # -----------------------------------------------------
-
+    # Sort semester
     marks_data["_sort"] = (
         marks_data[
             "Academic Semester"
@@ -1805,7 +1778,7 @@ def generate_pdf(student_data):
         )
 
     # =====================================================
-    # BUILD
+    # BUILD PDF
     # =====================================================
 
     document.build(
@@ -1974,9 +1947,35 @@ if filtered_df.empty:
 
 else:
 
+    # =====================================================
+    # TOTAL UNIQUE STUDENTS
+    # =====================================================
+
+    total_students = (
+        filtered_df[
+            "ID Number"
+        ]
+        .astype(str)
+        .str.strip()
+        .replace(
+            ["", "nan", "None"],
+            pd.NA
+        )
+        .dropna()
+        .nunique()
+    )
+
+    # =====================================================
+    # DEPARTMENT CGPA
+    # =====================================================
+
     department_cgpa = calculate_cgpa(
         filtered_df
     )
+
+    # =====================================================
+    # GRADES
+    # =====================================================
 
     department_grades = (
         filtered_df["Grade"]
@@ -1985,6 +1984,10 @@ else:
         .str.upper()
     )
 
+    # =====================================================
+    # CATEGORIES
+    # =====================================================
+
     department_categories = (
         filtered_df["Category"]
         .astype(str)
@@ -1992,11 +1995,19 @@ else:
         .str.upper()
     )
 
+    # =====================================================
+    # PASS
+    # =====================================================
+
     department_pass = (
         ~department_grades.isin(
             ["F", "FAIL"]
         )
     ).sum()
+
+    # =====================================================
+    # FAIL
+    # =====================================================
 
     department_fail = (
         department_grades.isin(
@@ -2004,36 +2015,51 @@ else:
         )
     ).sum()
 
+    # =====================================================
+    # DETAINED
+    # =====================================================
+
     department_dt = (
         department_categories
         .eq("DT")
         .sum()
     )
 
-    k1, k2, k3, k4 = st.columns(4)
+    # =====================================================
+    # FIVE KPI COLUMNS
+    # =====================================================
+
+    k1, k2, k3, k4, k5 = st.columns(5)
 
     with k1:
+
+        st.metric(
+            "Total Students",
+            int(total_students)
+        )
+
+    with k2:
 
         st.metric(
             "Average CGPA",
             f"{department_cgpa:.2f}"
         )
 
-    with k2:
+    with k3:
 
         st.metric(
             "Pass",
             int(department_pass)
         )
 
-    with k3:
+    with k4:
 
         st.metric(
             "Fail",
             int(department_fail)
         )
 
-    with k4:
+    with k5:
 
         st.metric(
             "Detained",
