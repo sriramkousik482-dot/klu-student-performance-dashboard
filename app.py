@@ -8,8 +8,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image,
+    HRFlowable
 )
+from reportlab.lib.utils import ImageReader
 from reportlab.lib.units import inch
 
 
@@ -50,7 +52,7 @@ st.markdown(
     border-radius: 12px; padding: 16px 18px;
 }
 .kpi .label {color: #9ca3af; font-size: 13px; letter-spacing: .5px;}
-.kpi .value {color: white; font-size: 30px; font-weight: 700;}
+.kpi .value {color: white; font-size: 26px; font-weight: 700;}
 </style>
 
 <div class="hero">
@@ -350,11 +352,18 @@ def generate_pdf(student_data):
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         "TitleStyle", parent=styles["Title"], alignment=TA_CENTER,
-        fontSize=16, leading=18,
+        fontName="Helvetica-Bold", fontSize=22, leading=26,
+        textColor=colors.HexColor("#1e3a8a"), spaceBefore=4, spaceAfter=2,
     )
     subtitle_style = ParagraphStyle(
         "SubtitleStyle", parent=styles["Normal"], alignment=TA_CENTER,
-        fontSize=9, leading=11,
+        fontName="Helvetica-Bold", fontSize=12, leading=15,
+        textColor=colors.HexColor("#374151"), spaceAfter=1,
+    )
+    tagline_style = ParagraphStyle(
+        "TaglineStyle", parent=styles["Normal"], alignment=TA_CENTER,
+        fontName="Helvetica", fontSize=9, leading=11,
+        textColor=colors.HexColor("#6b7280"),
     )
     heading_style = ParagraphStyle(
         "HeadingStyle", parent=styles["Heading2"], fontSize=11, leading=13,
@@ -383,19 +392,26 @@ def generate_pdf(student_data):
 
     story = []
 
-    # Logo
+    # Logo (keeps original aspect ratio, centered)
     if LOGO_FILE.exists():
         try:
-            logo = Image(str(LOGO_FILE), width=0.60 * inch, height=0.60 * inch)
+            iw, ih = ImageReader(str(LOGO_FILE)).getSize()
+            max_w, max_h = 4.2 * inch, 0.95 * inch
+            scale = min(max_w / iw, max_h / ih)
+            logo = Image(str(LOGO_FILE), width=iw * scale, height=ih * scale)
             logo.hAlign = "CENTER"
             story.append(logo)
-            story.append(Spacer(1, 3))
+            story.append(Spacer(1, 6))
         except Exception:
             pass
 
     story.append(Paragraph("KL UNIVERSITY", title_style))
     story.append(Paragraph("Department of CSE-4", subtitle_style))
-    story.append(Spacer(1, 8))
+    story.append(Paragraph("Student Academic Performance Report", tagline_style))
+    story.append(HRFlowable(
+        width="100%", thickness=1.2, color=colors.HexColor("#1e3a8a"),
+        spaceBefore=8, spaceAfter=6,
+    ))
 
     # Student details
     story.append(Paragraph("Student Details", heading_style))
@@ -570,17 +586,19 @@ else:
         base.isin(["F", "DT"]), "ID Number"
     ].nunique()
 
-    k1, k2, k3, k4, k5 = st.columns(5)
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
     with k1:
         kpi_card("TOTAL STUDENTS", f"{total_students:,}", "#3b82f6")
     with k2:
         kpi_card("AVERAGE CGPA", f"{department_cgpa:.2f}", "#8b5cf6")
     with k3:
-        kpi_card("COURSES PASSED", f"{pass_courses:,}", "#22c55e")
+        kpi_card("TOTAL PASSED", f"{pass_courses:,}", "#22c55e")
     with k4:
-        kpi_card("STUDENTS WITH BACKLOGS", f"{students_with_backlog:,}", "#f59e0b")
+        kpi_card("TOTAL FAILED", f"{fail_courses:,}", "#f97316")
     with k5:
-        kpi_card("DETAINED COURSES", f"{dt_courses:,}", "#ef4444")
+        kpi_card("BACKLOG STUDENTS", f"{students_with_backlog:,}", "#f59e0b")
+    with k6:
+        kpi_card("DETAINED", f"{dt_courses:,}", "#ef4444")
 
     st.write("")
 
