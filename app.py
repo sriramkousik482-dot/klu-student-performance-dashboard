@@ -5,6 +5,7 @@ import seaborn as sns
 
 from io import BytesIO
 from pathlib import Path
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -19,7 +20,14 @@ from reportlab.platypus import (
     PageBreak
 )
 from reportlab.lib.units import inch
+
+
+# =========================================================
+# PATHS
+# =========================================================
+
 BASE_DIR = Path(__file__).resolve().parent
+
 LOGO_PATH = BASE_DIR / "klu_logo.png.jpg"
 
 
@@ -43,10 +51,16 @@ def load_data():
 
     df = pd.read_csv("student.csv")
 
+    # -----------------------------------------------------
     # Clean column names
+    # -----------------------------------------------------
+
     df.columns = df.columns.str.strip()
 
+    # -----------------------------------------------------
     # Clean text columns
+    # -----------------------------------------------------
+
     for col in df.columns:
 
         if df[col].dtype == "object":
@@ -57,7 +71,10 @@ def load_data():
                 .str.strip()
             )
 
+    # -----------------------------------------------------
     # Numeric columns
+    # -----------------------------------------------------
+
     df["Points"] = pd.to_numeric(
         df["Points"],
         errors="coerce"
@@ -68,14 +85,20 @@ def load_data():
         errors="coerce"
     )
 
+    # -----------------------------------------------------
     # Student ID
+    # -----------------------------------------------------
+
     df["ID Number"] = (
         df["ID Number"]
         .astype(str)
         .str.strip()
     )
 
+    # -----------------------------------------------------
     # Semester
+    # -----------------------------------------------------
+
     df["Semester"] = (
         df["Semester"]
         .astype(str)
@@ -369,8 +392,9 @@ def show_student_performance(student_id):
         .apply(get_result)
     )
 
+    # F and DT are considered backlog-related records
     backlog_data = student_data[
-        results == "F"
+        results.isin(["F", "DT"])
     ]
 
     backlog_count = len(
@@ -891,8 +915,10 @@ elif len(matching_student_ids) > 1:
         )
 
         student_backlogs = (
-            complete_results == "F"
-        ).sum()
+            complete_results.isin(
+                ["F", "DT"]
+            ).sum()
+        )
 
         student_summary.append({
 
@@ -950,7 +976,6 @@ st.subheader(
 )
 
 
-# Initialize
 average_semester_cgpa = (
     pd.DataFrame()
 )
@@ -1087,8 +1112,6 @@ if matching_student_ids:
 
         )
 
-
-        # Values above points
 
         for _, row in (
             average_semester_cgpa.iterrows()
@@ -1426,6 +1449,10 @@ def create_graph_image(
     return graph_buffer
 
 
+# =========================================================
+# CREATE DASHBOARD PDF
+# =========================================================
+
 def create_dashboard_pdf(
     filtered_df,
     matching_student_ids,
@@ -1451,7 +1478,13 @@ def create_dashboard_pdf(
         bottomMargin=30
     )
 
+
+    # =====================================================
+    # PDF STYLES
+    # =====================================================
+
     styles = getSampleStyleSheet()
+
 
     title_style = ParagraphStyle(
         "PDFTitle",
@@ -1463,6 +1496,7 @@ def create_dashboard_pdf(
         spaceAfter=5
     )
 
+
     department_style = ParagraphStyle(
         "Department",
         parent=styles["Heading2"],
@@ -1472,6 +1506,7 @@ def create_dashboard_pdf(
         textColor=colors.HexColor("#1565C0"),
         spaceAfter=5
     )
+
 
     subtitle_style = ParagraphStyle(
         "Subtitle",
@@ -1483,6 +1518,7 @@ def create_dashboard_pdf(
         spaceAfter=12
     )
 
+
     heading_style = ParagraphStyle(
         "PDFHeading",
         parent=styles["Heading2"],
@@ -1493,6 +1529,7 @@ def create_dashboard_pdf(
         spaceAfter=8
     )
 
+
     normal_style = ParagraphStyle(
         "NormalPDF",
         parent=styles["Normal"],
@@ -1500,7 +1537,9 @@ def create_dashboard_pdf(
         leading=12
     )
 
+
     story = []
+
 
     # =====================================================
     # KLU LOGO
@@ -1516,8 +1555,14 @@ def create_dashboard_pdf(
 
         logo.hAlign = "CENTER"
 
-        story.append(logo)
-        story.append(Spacer(1, 8))
+        story.append(
+            logo
+        )
+
+        story.append(
+            Spacer(1, 8)
+        )
+
 
     # =====================================================
     # HEADER
@@ -1530,12 +1575,14 @@ def create_dashboard_pdf(
         )
     )
 
+
     story.append(
         Paragraph(
             "Department of CSE-4",
             department_style
         )
     )
+
 
     story.append(
         Paragraph(
@@ -1544,11 +1591,17 @@ def create_dashboard_pdf(
         )
     )
 
+
     header_line = Table(
         [[""]],
-        colWidths=[7.0 * inch],
-        rowHeights=[4]
+        colWidths=[
+            7.0 * inch
+        ],
+        rowHeights=[
+            4
+        ]
     )
+
 
     header_line.setStyle(
         TableStyle([
@@ -1561,8 +1614,15 @@ def create_dashboard_pdf(
         ])
     )
 
-    story.append(header_line)
-    story.append(Spacer(1, 15))
+
+    story.append(
+        header_line
+    )
+
+    story.append(
+        Spacer(1, 15)
+    )
+
 
     # =====================================================
     # NO STUDENT SELECTED
@@ -1584,14 +1644,17 @@ def create_dashboard_pdf(
             )
         )
 
-        doc.build(story)
+        doc.build(
+            story
+        )
 
         pdf_buffer.seek(0)
 
         return pdf_buffer
 
+
     # =====================================================
-    # STUDENT DETAILS
+    # STUDENT REPORT
     # =====================================================
 
     for student_id in matching_student_ids:
@@ -1600,16 +1663,23 @@ def create_dashboard_pdf(
             df["ID Number"] == student_id
         ].copy()
 
+
         if student_data.empty:
+
             continue
 
+
         student_name = str(
-            student_data["Name"].iloc[0]
+            student_data[
+                "Name"
+            ].iloc[0]
         )
+
 
         overall_cgpa = calculate_cgpa(
             student_data
         )
+
 
         # =================================================
         # STUDENT INFORMATION
@@ -1622,22 +1692,42 @@ def create_dashboard_pdf(
             )
         )
 
+
         student_info = [
-            ["Student ID", str(student_id)],
-            ["Student Name", student_name],
-            ["Overall CGPA", f"{overall_cgpa:.2f} / 10"],
+
+            [
+                "Student ID",
+                str(student_id)
+            ],
+
+            [
+                "Student Name",
+                student_name
+            ],
+
+            [
+                "Overall CGPA",
+                f"{overall_cgpa:.2f} / 10"
+            ]
+
         ]
 
+
         student_info_table = Table(
+
             student_info,
+
             colWidths=[
                 1.7 * inch,
                 5.3 * inch
             ]
+
         )
+
 
         student_info_table.setStyle(
             TableStyle([
+
                 (
                     "BACKGROUND",
                     (0, 0),
@@ -1673,123 +1763,160 @@ def create_dashboard_pdf(
                     (-1, -1),
                     "MIDDLE"
                 )
+
             ])
         )
+
 
         story.append(
             student_info_table
         )
 
-        story.append(Spacer(1, 10))
-        # =================================================
-# BACKLOG SUMMARY
-# =================================================
 
-fail_count = (
-    student_data["Grade"]
-    .apply(
-        lambda x: str(x).strip().upper() in ["F", "FAIL"]
-    )
-    .sum()
-)
-
-dt_count = (
-    student_data["Grade"]
-    .apply(
-        lambda x: str(x).strip().upper() == "DT"
-    )
-    .sum()
-)
-
-story.append(
-    Paragraph(
-        "Backlog Summary",
-        heading_style
-    )
-)
-
-backlog_summary_data = [
-    ["Backlog Type", "Number"],
-    ["FAIL", str(fail_count)],
-    ["DT", str(dt_count)]
-]
-
-backlog_summary_table = Table(
-    backlog_summary_data,
-    colWidths=[
-        3.5 * inch,
-        3.5 * inch
-    ]
-)
-
-backlog_summary_table.setStyle(
-    TableStyle([
-        (
-            "BACKGROUND",
-            (0, 0),
-            (-1, 0),
-            colors.HexColor("#1565C0")
-        ),
-        (
-            "TEXTCOLOR",
-            (0, 0),
-            (-1, 0),
-            colors.white
-        ),
-        (
-            "FONTNAME",
-            (0, 0),
-            (-1, 0),
-            "Helvetica-Bold"
-        ),
-        (
-            "FONTSIZE",
-            (0, 0),
-            (-1, -1),
-            9
-        ),
-        (
-            "GRID",
-            (0, 0),
-            (-1, -1),
-            0.5,
-            colors.grey
-        ),
-        (
-            "ALIGN",
-            (0, 0),
-            (-1, -1),
-            "CENTER"
-        ),
-        (
-            "VALIGN",
-            (0, 0),
-            (-1, -1),
-            "MIDDLE"
-        ),
-        (
-            "PADDING",
-            (0, 0),
-            (-1, -1),
-            7
+        story.append(
+            Spacer(1, 10)
         )
-    ])
-)
-
-story.append(backlog_summary_table)
-story.append(Spacer(1, 10))
 
 
-# =================================================
-# ACADEMIC PERFORMANCE
-# =================================================
+        # =================================================
+        # BACKLOG SUMMARY
+        # =================================================
 
-story.append(
-    Paragraph(
-        "Academic Performance",
-        heading_style
-    )
-)
+        fail_count = (
+            student_data["Grade"]
+            .apply(
+                lambda x:
+                str(x).strip().upper()
+                in ["F", "FAIL"]
+            )
+            .sum()
+        )
+
+
+        dt_count = (
+            student_data["Grade"]
+            .apply(
+                lambda x:
+                str(x).strip().upper()
+                == "DT"
+            )
+            .sum()
+        )
+
+
+        story.append(
+            Paragraph(
+                "Backlog Summary",
+                heading_style
+            )
+        )
+
+
+        backlog_summary_data = [
+
+            [
+                "Backlog Type",
+                "Number"
+            ],
+
+            [
+                "FAIL",
+                str(fail_count)
+            ],
+
+            [
+                "DT",
+                str(dt_count)
+            ]
+
+        ]
+
+
+        backlog_summary_table = Table(
+
+            backlog_summary_data,
+
+            colWidths=[
+                3.5 * inch,
+                3.5 * inch
+            ]
+
+        )
+
+
+        backlog_summary_table.setStyle(
+            TableStyle([
+
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, 0),
+                    colors.HexColor("#1565C0")
+                ),
+
+                (
+                    "TEXTCOLOR",
+                    (0, 0),
+                    (-1, 0),
+                    colors.white
+                ),
+
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (-1, 0),
+                    "Helvetica-Bold"
+                ),
+
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.grey
+                ),
+
+                (
+                    "ALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "CENTER"
+                ),
+
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE"
+                ),
+
+                (
+                    "PADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                )
+
+            ])
+        )
+
+
+        story.append(
+            backlog_summary_table
+        )
+
+
+        story.append(
+            Spacer(1, 10)
+        )
+
 
         # =================================================
         # ACADEMIC PERFORMANCE
@@ -1802,7 +1929,9 @@ story.append(
             )
         )
 
+
         detail_data = [
+
             [
                 "Semester",
                 "Course Code",
@@ -1812,19 +1941,36 @@ story.append(
                 "Credits",
                 "Result"
             ]
+
         ]
 
-        # Sort by semester
+
+        # =================================================
+        # SORT BY SEMESTER
+        # =================================================
+
         student_data = student_data.copy()
 
+
         student_data["_sort"] = (
-            student_data["Semester"]
-            .apply(semester_sort_key)
+            student_data[
+                "Semester"
+            ]
+            .apply(
+                semester_sort_key
+            )
         )
 
-        student_data = student_data.sort_values(
-            "_sort"
+
+        student_data = (
+            student_data
+            .sort_values("_sort")
         )
+
+
+        # =================================================
+        # ACADEMIC TABLE DATA
+        # =================================================
 
         for _, row in student_data.iterrows():
 
@@ -1832,28 +1978,54 @@ story.append(
                 row["Grade"]
             )
 
+
             detail_data.append([
-                str(row["Semester"]),
-                str(row["Course Code"]),
-                str(row["Course Name"]),
-                str(row["Grade"]),
+
+                str(
+                    row["Semester"]
+                ),
+
+                str(
+                    row["Course Code"]
+                ),
+
+                str(
+                    row["Course Name"]
+                ),
+
+                str(
+                    row["Grade"]
+                ),
+
                 (
                     f"{row['Points']:.2f}"
-                    if pd.notna(row["Points"])
+                    if pd.notna(
+                        row["Points"]
+                    )
                     else ""
                 ),
+
                 (
                     f"{row['Credits']:.1f}"
-                    if pd.notna(row["Credits"])
+                    if pd.notna(
+                        row["Credits"]
+                    )
                     else ""
                 ),
+
                 result
+
             ])
 
+
         detail_table = Table(
+
             detail_data,
+
             repeatRows=1,
+
             colWidths=[
+
                 0.75 * inch,
                 0.85 * inch,
                 3.55 * inch,
@@ -1861,8 +2033,11 @@ story.append(
                 0.65 * inch,
                 0.60 * inch,
                 0.70 * inch
+
             ]
+
         )
+
 
         detail_table.setStyle(
             TableStyle([
@@ -1933,12 +2108,15 @@ story.append(
                     (-1, -1),
                     4
                 )
+
             ])
         )
+
 
         story.append(
             detail_table
         )
+
 
         # =================================================
         # SEMESTER-WISE CGPA
@@ -1951,43 +2129,67 @@ story.append(
             )
         )
 
+
         semester_data = []
 
+
         for semester, sem_df in (
-            student_data.groupby("Semester")
+            student_data.groupby(
+                "Semester"
+            )
         ):
 
             semester_cgpa = calculate_cgpa(
                 sem_df
             )
 
+
             semester_data.append([
+
                 str(semester),
+
                 f"{semester_cgpa:.2f} / 10",
+
                 str(len(sem_df))
+
             ])
 
+
         semester_data.sort(
-            key=lambda x: semester_sort_key(x[0])
+            key=lambda x:
+            semester_sort_key(
+                x[0]
+            )
         )
 
+
         semester_table_data = [
+
             [
                 "Semester",
                 "Semester CGPA",
                 "Courses"
             ]
+
         ] + semester_data
 
+
         semester_table = Table(
+
             semester_table_data,
+
             repeatRows=1,
+
             colWidths=[
+
                 2.2 * inch,
                 2.4 * inch,
                 2.4 * inch
+
             ]
+
         )
+
 
         semester_table.setStyle(
             TableStyle([
@@ -2044,12 +2246,15 @@ story.append(
                     (-1, -1),
                     6
                 )
+
             ])
         )
+
 
         story.append(
             semester_table
         )
+
 
         # =================================================
         # BACKLOG SUBJECTS
@@ -2062,10 +2267,18 @@ story.append(
             )
         )
 
+
+        # Include BOTH F and DT
         backlog_data = student_data[
-            student_data["Grade"]
-            .apply(get_result) == "F"
+            student_data[
+                "Grade"
+            ]
+            .apply(get_result)
+            .isin(
+                ["F", "DT"]
+            )
         ]
+
 
         if backlog_data.empty:
 
@@ -2076,9 +2289,11 @@ story.append(
                 )
             )
 
+
         else:
 
             backlog_table_data = [
+
                 [
                     "Course Code",
                     "Course Name",
@@ -2086,33 +2301,61 @@ story.append(
                     "Points",
                     "Semester"
                 ]
+
             ]
 
-            for _, row in backlog_data.iterrows():
+
+            for _, row in (
+                backlog_data.iterrows()
+            ):
 
                 backlog_table_data.append([
-                    str(row["Course Code"]),
-                    str(row["Course Name"]),
-                    str(row["Grade"]),
+
+                    str(
+                        row["Course Code"]
+                    ),
+
+                    str(
+                        row["Course Name"]
+                    ),
+
+                    str(
+                        row["Grade"]
+                    ),
+
                     (
                         f"{row['Points']:.2f}"
-                        if pd.notna(row["Points"])
+                        if pd.notna(
+                            row["Points"]
+                        )
                         else ""
                     ),
-                    str(row["Semester"])
+
+                    str(
+                        row["Semester"]
+                    )
+
                 ])
 
+
             backlog_table = Table(
+
                 backlog_table_data,
+
                 repeatRows=1,
+
                 colWidths=[
+
                     1.0 * inch,
                     3.0 * inch,
                     0.7 * inch,
                     0.8 * inch,
                     1.5 * inch
+
                 ]
+
             )
+
 
             backlog_table.setStyle(
                 TableStyle([
@@ -2169,46 +2412,70 @@ story.append(
                         (-1, -1),
                         5
                     )
+
                 ])
             )
+
 
             story.append(
                 backlog_table
             )
 
-        # Page break between students
+
+        # =================================================
+        # PAGE BREAK BETWEEN STUDENTS
+        # =================================================
+
         if student_id != matching_student_ids[-1]:
 
             story.append(
                 PageBreak()
             )
 
+
     # =====================================================
     # FOOTER
     # =====================================================
 
     story.append(
-        Spacer(1, 15)
+        Spacer(
+            1,
+            15
+        )
     )
+
 
     story.append(
         Paragraph(
+
             "KL UNIVERSITY | Department of CSE-4",
+
             ParagraphStyle(
+
                 "Footer",
+
                 parent=styles["Normal"],
+
                 fontSize=8,
+
                 alignment=TA_CENTER,
+
                 textColor=colors.HexColor("#777777")
+
             )
+
         )
     )
+
 
     # =====================================================
     # BUILD PDF
     # =====================================================
 
-    doc.build(story)
+    doc.build(
+        story
+    )
+
 
     pdf_buffer.seek(0)
 
@@ -2312,9 +2579,11 @@ if st.button(
 
             )
 
+
         st.success(
             "Student academic PDF generated successfully! ✅"
         )
+
 
         st.download_button(
 
