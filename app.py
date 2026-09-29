@@ -1681,6 +1681,115 @@ def create_dashboard_pdf(
         )
 
         story.append(Spacer(1, 10))
+        # =================================================
+# BACKLOG SUMMARY
+# =================================================
+
+fail_count = (
+    student_data["Grade"]
+    .apply(
+        lambda x: str(x).strip().upper() in ["F", "FAIL"]
+    )
+    .sum()
+)
+
+dt_count = (
+    student_data["Grade"]
+    .apply(
+        lambda x: str(x).strip().upper() == "DT"
+    )
+    .sum()
+)
+
+story.append(
+    Paragraph(
+        "Backlog Summary",
+        heading_style
+    )
+)
+
+backlog_summary_data = [
+    ["Backlog Type", "Number"],
+    ["FAIL", str(fail_count)],
+    ["DT", str(dt_count)]
+]
+
+backlog_summary_table = Table(
+    backlog_summary_data,
+    colWidths=[
+        3.5 * inch,
+        3.5 * inch
+    ]
+)
+
+backlog_summary_table.setStyle(
+    TableStyle([
+        (
+            "BACKGROUND",
+            (0, 0),
+            (-1, 0),
+            colors.HexColor("#1565C0")
+        ),
+        (
+            "TEXTCOLOR",
+            (0, 0),
+            (-1, 0),
+            colors.white
+        ),
+        (
+            "FONTNAME",
+            (0, 0),
+            (-1, 0),
+            "Helvetica-Bold"
+        ),
+        (
+            "FONTSIZE",
+            (0, 0),
+            (-1, -1),
+            9
+        ),
+        (
+            "GRID",
+            (0, 0),
+            (-1, -1),
+            0.5,
+            colors.grey
+        ),
+        (
+            "ALIGN",
+            (0, 0),
+            (-1, -1),
+            "CENTER"
+        ),
+        (
+            "VALIGN",
+            (0, 0),
+            (-1, -1),
+            "MIDDLE"
+        ),
+        (
+            "PADDING",
+            (0, 0),
+            (-1, -1),
+            7
+        )
+    ])
+)
+
+story.append(backlog_summary_table)
+story.append(Spacer(1, 10))
+
+
+# =================================================
+# ACADEMIC PERFORMANCE
+# =================================================
+
+story.append(
+    Paragraph(
+        "Academic Performance",
+        heading_style
+    )
+)
 
         # =================================================
         # ACADEMIC PERFORMANCE
