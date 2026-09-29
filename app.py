@@ -1,24 +1,25 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from io import BytesIO
 from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import (
+    getSampleStyleSheet,
+    ParagraphStyle
+)
 from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
     Spacer,
     Table,
     TableStyle,
-    Image,
-    PageBreak
+    Image
 )
-from reportlab.lib.units import inch
 
 
 # =========================================================
@@ -51,9 +52,9 @@ def load_data():
 
     df = pd.read_csv(CSV_FILE)
 
-    # -----------------------------------------------------
+    # =====================================================
     # CLEAN COLUMN NAMES
-    # -----------------------------------------------------
+    # =====================================================
 
     df.columns = (
         df.columns
@@ -61,9 +62,9 @@ def load_data():
         .str.strip()
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # CLEAN STRING COLUMNS
-    # -----------------------------------------------------
+    # =====================================================
 
     for col in df.columns:
 
@@ -71,13 +72,13 @@ def load_data():
 
             df[col] = (
                 df[col]
-                .astype(str)
+                .astype("string")
                 .str.strip()
             )
 
-    # -----------------------------------------------------
+    # =====================================================
     # NUMERIC COLUMNS
-    # -----------------------------------------------------
+    # =====================================================
 
     if "Points" in df.columns:
 
@@ -93,9 +94,21 @@ def load_data():
             errors="coerce"
         )
 
-    # -----------------------------------------------------
+    # =====================================================
+    # ID NUMBER
+    # =====================================================
+
+    if "ID Number" in df.columns:
+
+        df["ID Number"] = (
+            df["ID Number"]
+            .astype("string")
+            .str.strip()
+        )
+
+    # =====================================================
     # CREDIT POINTS
-    # -----------------------------------------------------
+    # =====================================================
 
     if (
         "Points" in df.columns
@@ -104,28 +117,23 @@ def load_data():
     ):
 
         df["Credit Points"] = (
-            df["Points"] * df["Credits"]
+            df["Points"] *
+            df["Credits"]
         )
 
-    # -----------------------------------------------------
-    # ID NUMBER
-    # -----------------------------------------------------
-
-    df["ID Number"] = (
-        df["ID Number"]
-        .astype(str)
-        .str.strip()
-    )
-
-    # -----------------------------------------------------
+    # =====================================================
     # JOINING YEAR
     #
     # 23XXXXXXXX -> Y23
     # 24XXXXXXXX -> Y24
     # 25XXXXXXXX -> Y25
-    # -----------------------------------------------------
+    # =====================================================
 
     def get_joining_year(student_id):
+
+        if pd.isna(student_id):
+
+            return "Unknown"
 
         try:
 
@@ -141,48 +149,104 @@ def load_data():
 
             return "Unknown"
 
-        except:
+        except Exception:
 
             return "Unknown"
 
-    df["Year"] = df["ID Number"].apply(
-        get_joining_year
+
+    df["Year"] = (
+        df["ID Number"]
+        .apply(get_joining_year)
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # NORMALIZE SEMESTER
-    # -----------------------------------------------------
+    # =====================================================
 
     if "Semester" in df.columns:
 
+        def normalize_semester(value):
+
+            # Missing values
+            if pd.isna(value):
+
+                return ""
+
+            value = str(
+                value
+            ).strip()
+
+            value_lower = (
+                value.lower()
+            )
+
+            if value_lower in [
+                "odd",
+                "odd sem"
+            ]:
+
+                return "Odd Sem"
+
+            elif value_lower in [
+                "even",
+                "even sem"
+            ]:
+
+                return "Even Sem"
+
+            elif "summer" in value_lower:
+
+                return "Summer Term"
+
+            else:
+
+                return value
+
+
         df["Semester"] = (
             df["Semester"]
-            .astype(str)
-            .str.strip()
+            .apply(normalize_semester)
         )
 
-        df["Semester"] = df["Semester"].apply(
-            lambda x:
-            "Odd Sem"
-            if x.lower() in ["odd", "odd sem"]
-            else
-            "Even Sem"
-            if x.lower() in ["even", "even sem"]
-            else
-            "Summer Term"
-            if "summer" in x.lower()
-            else x
+    else:
+
+        df["Semester"] = ""
+
+    # =====================================================
+    # CATEGORY
+    # =====================================================
+
+    if "Category" in df.columns:
+
+        df["Category"] = (
+            df["Category"]
+            .fillna("-")
+            .astype(str)
+            .str.strip()
+            .str.upper()
         )
+
+    else:
+
+        df["Category"] = "-"
 
     # =====================================================
     # MENTOR COLUMN
+    #
+    # Automatically detects:
+    # Mentor
+    # Mentor Name
+    # MentorName
+    # Mentor_Name
+    # Faculty Mentor
+    # etc.
     # =====================================================
 
     mentor_column = None
 
     for col in df.columns:
 
-        col_clean = (
+        column_name = (
             str(col)
             .strip()
             .lower()
@@ -190,32 +254,34 @@ def load_data():
             .replace("-", " ")
         )
 
-        if "mentor" in col_clean:
+        if "mentor" in column_name:
 
             mentor_column = col
+
             break
 
-    # -----------------------------------------------------
-    # CREATE STANDARD MENTOR NAME COLUMN
-    # -----------------------------------------------------
+    # =====================================================
+    # CREATE STANDARD MENTOR NAME
+    # =====================================================
 
     if mentor_column is not None:
 
         df["Mentor Name"] = (
             df[mentor_column]
-            .astype(str)
+            .astype("string")
             .str.strip()
+            .fillna("")
         )
 
         df["Mentor Name"] = (
             df["Mentor Name"]
             .replace(
                 [
-                    "",
                     "nan",
                     "NaN",
                     "None",
-                    "NONE"
+                    "NONE",
+                    "<NA>"
                 ],
                 ""
             )
@@ -226,7 +292,7 @@ def load_data():
         df["Mentor Name"] = ""
 
     # =====================================================
-    # ACADEMIC SEMESTER
+    # ACADEMIC SEMESTER CALCULATION
     # =====================================================
 
     def calculate_academic_semester(
@@ -236,6 +302,22 @@ def load_data():
     ):
 
         try:
+
+            # ---------------------------------------------
+            # MISSING VALUES
+            # ---------------------------------------------
+
+            if pd.isna(joining_year):
+
+                return None
+
+            if pd.isna(academic_year):
+
+                return None
+
+            if pd.isna(semester_type):
+
+                return None
 
             joining_year = str(
                 joining_year
@@ -250,7 +332,11 @@ def load_data():
             ).strip().lower()
 
             # ---------------------------------------------
-            # CONVERT Y23 -> 2023
+            # JOINING YEAR
+            #
+            # Y23 -> 2023
+            # Y24 -> 2024
+            # Y25 -> 2025
             # ---------------------------------------------
 
             if joining_year.startswith("Y"):
@@ -267,14 +353,15 @@ def load_data():
                 )
 
             # ---------------------------------------------
-            # AY:
+            # ACADEMIC YEAR
             #
             # 2023-2024 -> 2023
             # 2024-2025 -> 2024
             # ---------------------------------------------
 
             academic_start_year = int(
-                academic_year.split("-")[0]
+                academic_year
+                .split("-")[0]
             )
 
             # ---------------------------------------------
@@ -288,7 +375,7 @@ def load_data():
             )
 
             # ---------------------------------------------
-            # IGNORE SUMMER TERM
+            # SUMMER TERM
             # ---------------------------------------------
 
             if "summer" in semester_type:
@@ -319,18 +406,22 @@ def load_data():
 
                 return None
 
+            # ---------------------------------------------
+            # RESULT
+            # ---------------------------------------------
+
             return (
                 f"{year_of_study}-"
                 f"{semester_number}"
             )
 
-        except:
+        except Exception:
 
             return None
 
-    # -----------------------------------------------------
+    # =====================================================
     # CREATE ACADEMIC SEMESTER COLUMN
-    # -----------------------------------------------------
+    # =====================================================
 
     df["Academic Semester"] = df.apply(
 
@@ -355,7 +446,7 @@ df = load_data()
 
 
 # =========================================================
-# CGPA CALCULATION
+# CALCULATE CGPA
 # =========================================================
 
 def calculate_cgpa(data):
@@ -377,7 +468,8 @@ def calculate_cgpa(data):
 
     total_credit_points = (
         valid_data["Points"]
-        * valid_data["Credits"]
+        *
+        valid_data["Credits"]
     ).sum()
 
     total_credits = (
@@ -390,7 +482,8 @@ def calculate_cgpa(data):
 
     return (
         total_credit_points
-        / total_credits
+        /
+        total_credits
     )
 
 
@@ -399,6 +492,10 @@ def calculate_cgpa(data):
 # =========================================================
 
 def get_result(grade):
+
+    if pd.isna(grade):
+
+        return "PASS"
 
     grade = str(
         grade
@@ -415,7 +512,7 @@ def get_result(grade):
 
 
 # =========================================================
-# CATEGORY
+# CLEAN CATEGORY
 # =========================================================
 
 def clean_category(category):
@@ -436,7 +533,7 @@ def clean_category(category):
 
 
 # =========================================================
-# SEMESTER SORT
+# SEMESTER SORTING
 # =========================================================
 
 def semester_sort_key(value):
@@ -452,7 +549,7 @@ def semester_sort_key(value):
             int(parts[1])
         )
 
-    except:
+    except Exception:
 
         return (
             999,
@@ -489,46 +586,34 @@ def show_course_card(row):
     st.markdown(
         f"""
         <div style="
-            border: 1px solid #d9d9d9;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 12px;
-            background-color: white;
-            box-shadow: 0px 1px 4px rgba(0,0,0,0.08);
+            border:1px solid #ddd;
+            border-radius:10px;
+            padding:15px;
+            margin-bottom:10px;
+            background-color:#fafafa;
         ">
 
-        <div style="
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        ">
-            {course_code}
-        </div>
+        <b>{course_code}</b>
 
-        <div style="
-            font-size: 15px;
-            margin-bottom: 12px;
-        ">
-            {course_name}
-        </div>
+        <br>
 
-        <div>
+        {course_name}
 
-            <b>Grade:</b> {grade}
+        <br><br>
 
-            &nbsp;&nbsp;&nbsp;
+        <b>Grade:</b> {grade}
 
-            <b>Category:</b> {category}
+        &nbsp;&nbsp;
 
-            &nbsp;&nbsp;&nbsp;
+        <b>Category:</b> {category}
 
-            <b>Points:</b> {points}
+        &nbsp;&nbsp;
 
-            &nbsp;&nbsp;&nbsp;
+        <b>Points:</b> {points}
 
-            <b>Credits:</b> {credits}
+        &nbsp;&nbsp;
 
-        </div>
+        <b>Credits:</b> {credits}
 
         </div>
         """,
@@ -537,7 +622,7 @@ def show_course_card(row):
 
 
 # =========================================================
-# SHOW SEMESTER COURSE CARDS
+# SEMESTER CARDS
 # =========================================================
 
 def show_semester_cards(student_data):
@@ -545,16 +630,10 @@ def show_semester_cards(student_data):
     if student_data.empty:
 
         st.info(
-            "No academic records found."
+            "No course records found."
         )
 
         return
-
-    # -----------------------------------------------------
-    # ONLY ACTUAL SEMESTERS
-    #
-    # Summer Term has None, so dropna removes it.
-    # -----------------------------------------------------
 
     semesters = (
         student_data[
@@ -565,26 +644,10 @@ def show_semester_cards(student_data):
         .tolist()
     )
 
-    # -----------------------------------------------------
-    # SORT:
-    #
-    # 1-1
-    # 1-2
-    # 2-1
-    # 2-2
-    # 3-1
-    # 3-2
-    # ...
-    # -----------------------------------------------------
-
     semesters = sorted(
         semesters,
         key=semester_sort_key
     )
-
-    # -----------------------------------------------------
-    # DISPLAY
-    # -----------------------------------------------------
 
     for semester in semesters:
 
@@ -597,25 +660,17 @@ def show_semester_cards(student_data):
             .copy()
         )
 
-        # -----------------------------------------------
-        # SAME PREVIOUS STYLE
-        # -----------------------------------------------
-
         st.markdown(
             f"### 📘 {semester}"
         )
 
-        # -----------------------------------------------
-        # COURSE CARDS
-        # -----------------------------------------------
-
-        for _, row in semester_data.iterrows():
+        for _, row in (
+            semester_data.iterrows()
+        ):
 
             show_course_card(row)
 
-        st.markdown(
-            "---"
-        )
+        st.markdown("---")
 
 
 # =========================================================
@@ -691,7 +746,7 @@ st.sidebar.header(
 
 
 # =========================================================
-# JOINING YEAR
+# JOINING YEAR FILTER
 # =========================================================
 
 joining_years = sorted(
@@ -701,14 +756,16 @@ joining_years = sorted(
     .tolist()
 )
 
-selected_year = st.sidebar.selectbox(
-    "Joining Year",
-    ["All"] + joining_years
+selected_year = (
+    st.sidebar.selectbox(
+        "Joining Year",
+        ["All"] + joining_years
+    )
 )
 
 
 # =========================================================
-# COURSE CODE
+# COURSE CODE FILTER
 # =========================================================
 
 course_codes = sorted(
@@ -727,7 +784,7 @@ selected_course_code = (
 
 
 # =========================================================
-# COURSE NAME
+# COURSE NAME FILTER
 # =========================================================
 
 course_names = sorted(
@@ -756,7 +813,8 @@ if selected_year != "All":
 
     filtered_df = filtered_df[
         filtered_df["Year"]
-        == selected_year
+        ==
+        selected_year
     ]
 
 
@@ -764,7 +822,8 @@ if selected_course_code != "All":
 
     filtered_df = filtered_df[
         filtered_df["Course Code"]
-        == selected_course_code
+        ==
+        selected_course_code
     ]
 
 
@@ -772,31 +831,31 @@ if selected_course_name != "All":
 
     filtered_df = filtered_df[
         filtered_df["Course Name"]
-        == selected_course_name
+        ==
+        selected_course_name
     ]
 
 
 # =========================================================
-# MAIN SEARCH
+# STUDENT SEARCH
 # =========================================================
 
 st.markdown(
     "## 🔍 Search Student"
 )
 
-
-search_col1, search_col2 = st.columns(2)
-
+search_col1, search_col2 = (
+    st.columns(2)
+)
 
 with search_col1:
 
     student_search = st.text_input(
         "Search Student ID / Name",
         placeholder=(
-            "Enter student ID or name"
+            "Enter student ID or student name"
         )
     )
-
 
 with search_col2:
 
@@ -809,7 +868,7 @@ with search_col2:
 
 
 # =========================================================
-# STUDENT SEARCH
+# APPLY STUDENT SEARCH
 # =========================================================
 
 student_filtered_df = (
@@ -893,8 +952,9 @@ st.markdown(
     "## 📊 Dashboard Summary"
 )
 
-
-kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+kpi1, kpi2, kpi3, kpi4 = (
+    st.columns(4)
+)
 
 
 average_cgpa = calculate_cgpa(
@@ -902,7 +962,7 @@ average_cgpa = calculate_cgpa(
 )
 
 
-pass_count = (
+dashboard_pass = (
     student_filtered_df[
         "Grade"
     ]
@@ -912,7 +972,7 @@ pass_count = (
 )
 
 
-fail_count = (
+dashboard_fail = (
     student_filtered_df[
         "Grade"
     ]
@@ -922,7 +982,7 @@ fail_count = (
 )
 
 
-detained_count = (
+dashboard_dt = (
     student_filtered_df[
         "Category"
     ]
@@ -946,7 +1006,7 @@ with kpi2:
 
     st.metric(
         "Pass",
-        int(pass_count)
+        int(dashboard_pass)
     )
 
 
@@ -954,7 +1014,7 @@ with kpi3:
 
     st.metric(
         "Fail",
-        int(fail_count)
+        int(dashboard_fail)
     )
 
 
@@ -962,7 +1022,7 @@ with kpi4:
 
     st.metric(
         "Detained",
-        int(detained_count)
+        int(dashboard_dt)
     )
 
 
@@ -971,6 +1031,7 @@ with kpi4:
 # =========================================================
 
 st.markdown("---")
+
 
 unique_students = (
     student_filtered_df[
@@ -993,13 +1054,14 @@ else:
 
     student_options = []
 
-    for _, row in unique_students.iterrows():
+    for _, row in (
+        unique_students.iterrows()
+    ):
 
         student_options.append(
             f'{row["ID Number"]} - '
             f'{row["Name"]}'
         )
-
 
     selected_student = (
         st.selectbox(
@@ -1008,12 +1070,10 @@ else:
         )
     )
 
-
     selected_student_id = (
         selected_student
         .split(" - ")[0]
     )
-
 
     selected_student_data = (
         student_filtered_df[
@@ -1021,27 +1081,26 @@ else:
                 "ID Number"
             ]
             .astype(str)
-            == str(selected_student_id)
+            ==
+            str(selected_student_id)
         ]
         .copy()
     )
 
 
     # =====================================================
-    # GET STUDENT NAME
+    # STUDENT NAME
     # =====================================================
 
     student_name = str(
         selected_student_data[
             "Name"
         ].iloc[0]
-    )
+    ).strip()
 
 
     # =====================================================
-    # GET MENTOR
-    #
-    # Find first non-empty mentor value for student.
+    # MENTOR
     # =====================================================
 
     mentor_values = (
@@ -1052,17 +1111,19 @@ else:
         .str.strip()
     )
 
-
-    mentor_values = mentor_values[
-        ~mentor_values.str.lower().isin(
-            [
-                "",
-                "nan",
-                "none"
-            ]
-        )
-    ]
-
+    mentor_values = (
+        mentor_values[
+            ~mentor_values.str.lower().isin(
+                [
+                    "",
+                    "nan",
+                    "none",
+                    "<na>",
+                    "not available"
+                ]
+            )
+        ]
+    )
 
     if not mentor_values.empty:
 
@@ -1072,7 +1133,9 @@ else:
 
     else:
 
-        mentor_name = "Not Available"
+        mentor_name = (
+            "Not Available"
+        )
 
 
     # =====================================================
@@ -1083,11 +1146,9 @@ else:
         "## 👨‍🎓 Student Details"
     )
 
-
     detail_col1, detail_col2, detail_col3 = (
         st.columns(3)
     )
-
 
     with detail_col1:
 
@@ -1096,14 +1157,12 @@ else:
             f"{selected_student_id}"
         )
 
-
     with detail_col2:
 
         st.info(
             f"**Student Name**\n\n"
             f"{student_name}"
         )
-
 
     with detail_col3:
 
@@ -1114,20 +1173,12 @@ else:
 
 
     # =====================================================
-    # STUDENT CGPA
+    # STUDENT SUMMARY
     # =====================================================
 
     student_cgpa = calculate_cgpa(
         selected_student_data
     )
-
-
-    st.markdown(
-        "## 📈 Academic Summary"
-    )
-
-
-    s1, s2, s3, s4 = st.columns(4)
 
 
     student_pass = (
@@ -1170,9 +1221,22 @@ else:
         .str.strip()
         .str.upper()
         .isin(
-            ["F", "DT"]
+            [
+                "F",
+                "DT"
+            ]
         )
         .sum()
+    )
+
+
+    st.markdown(
+        "## 📈 Academic Summary"
+    )
+
+
+    s1, s2, s3, s4 = (
+        st.columns(4)
     )
 
 
@@ -1209,34 +1273,185 @@ else:
 
 
     # =====================================================
-    # SEMESTER-WISE COURSES
+    # VISUAL ANALYTICS
     # =====================================================
 
     st.markdown("---")
 
     st.markdown(
-        "## 📚 Academic Performance"
+        "## 📊 Visual Analytics"
     )
 
 
-    show_semester_cards(
-        selected_student_data
+    graph_col1, graph_col2 = (
+        st.columns(2)
     )
 
 
     # =====================================================
-    # COURSE TABLE
+    # GRADE DISTRIBUTION
     # =====================================================
+
+    grade_data = (
+        selected_student_data[
+            "Grade"
+        ]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+
+    grade_counts = (
+        grade_data
+        .value_counts()
+        .reset_index()
+    )
+
+
+    grade_counts.columns = [
+        "Grade",
+        "Count"
+    ]
+
+
+    with graph_col1:
+
+        st.markdown(
+            "### Grade Distribution"
+        )
+
+        st.bar_chart(
+            grade_counts.set_index(
+                "Grade"
+            )
+        )
+
+
+    # =====================================================
+    # CATEGORY DISTRIBUTION
+    # =====================================================
+
+    category_data = (
+        selected_student_data[
+            "Category"
+        ]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+
+    category_counts = (
+        category_data
+        .value_counts()
+        .reset_index()
+    )
+
+
+    category_counts.columns = [
+        "Category",
+        "Count"
+    ]
+
+
+    with graph_col2:
+
+        st.markdown(
+            "### Category Distribution"
+        )
+
+        st.bar_chart(
+            category_counts.set_index(
+                "Category"
+            )
+        )
+
+
+    # =====================================================
+    # SEMESTER-WISE CGPA DATA
+    # =====================================================
+
+    semester_graph_data = []
+
+
+    semester_list = (
+        selected_student_data[
+            "Academic Semester"
+        ]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+
+    semester_list = sorted(
+        semester_list,
+        key=semester_sort_key
+    )
+
+
+    for semester in semester_list:
+
+        sem_data = (
+            selected_student_data[
+                selected_student_data[
+                    "Academic Semester"
+                ] == semester
+            ]
+            .copy()
+        )
+
+
+        sem_cgpa = calculate_cgpa(
+            sem_data
+        )
+
+
+        semester_graph_data.append({
+
+            "Semester": semester,
+
+            "CGPA": round(
+                sem_cgpa,
+                2
+            )
+
+        })
+
+
+    if semester_graph_data:
+
+        semester_graph_df = pd.DataFrame(
+            semester_graph_data
+        )
+
+
+        st.markdown(
+            "### Semester-wise CGPA"
+        )
+
+
+        st.line_chart(
+            semester_graph_df.set_index(
+                "Semester"
+            )
+        )
+
+
+    # =====================================================
+    # COURSE-WISE TABLE
+    # =====================================================
+
+    st.markdown("---")
 
     st.markdown(
-        "## 📋 Course Records"
+        "## 📚 Course-wise Academic Data"
     )
 
 
-    display_columns = [
+    course_table_columns = [
 
-        "ID Number",
-        "Name",
         "Course Code",
         "Course Name",
         "Academic Semester",
@@ -1248,16 +1463,221 @@ else:
     ]
 
 
+    course_table = (
+        selected_student_data[
+            course_table_columns
+        ]
+        .copy()
+    )
+
+
+    course_table = (
+        course_table
+        .sort_values(
+            by="Academic Semester",
+            key=lambda x:
+            x.map(
+                semester_sort_key
+            )
+        )
+    )
+
+
+    st.dataframe(
+        course_table,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # =====================================================
+    # SEMESTER-WISE TABLE
+    # =====================================================
+
+    st.markdown(
+        "## 📅 Semester-wise Summary"
+    )
+
+
+    semester_table_data = []
+
+
+    for semester in semester_list:
+
+        sem_data = (
+            selected_student_data[
+                selected_student_data[
+                    "Academic Semester"
+                ] == semester
+            ]
+            .copy()
+        )
+
+
+        sem_cgpa = calculate_cgpa(
+            sem_data
+        )
+
+
+        total_credits = (
+            pd.to_numeric(
+                sem_data[
+                    "Credits"
+                ],
+                errors="coerce"
+            )
+            .fillna(0)
+            .sum()
+        )
+
+
+        total_courses = len(
+            sem_data
+        )
+
+
+        semester_table_data.append({
+
+            "Semester": semester,
+
+            "Total Courses": int(
+                total_courses
+            ),
+
+            "Total Credits": round(
+                total_credits,
+                2
+            ),
+
+            "CGPA": round(
+                sem_cgpa,
+                2
+            )
+
+        })
+
+
+    semester_summary_df = pd.DataFrame(
+        semester_table_data
+    )
+
+
+    st.dataframe(
+        semester_summary_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # =====================================================
+    # CATEGORY-WISE TABLE
+    # =====================================================
+
+    st.markdown(
+        "## 📋 Category-wise Summary"
+    )
+
+
+    category_order = [
+
+        "AB",
+        "DT",
+        "F",
+        "MTO",
+        "-",
+        "BLNA",
+        "GP/MP",
+        "NA"
+
+    ]
+
+
+    category_table_data = []
+
+
+    for category in category_order:
+
+        count = (
+            category_data
+            .eq(category)
+            .sum()
+        )
+
+
+        category_table_data.append({
+
+            "Category": category,
+
+            "Count": int(count)
+
+        })
+
+
+    category_summary_df = pd.DataFrame(
+        category_table_data
+    )
+
+
+    st.dataframe(
+        category_summary_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # =====================================================
+    # ACADEMIC PERFORMANCE - SEMESTER CARDS
+    # =====================================================
+
+    st.markdown("---")
+
+    st.markdown(
+        "## 📖 Academic Performance"
+    )
+
+
+    show_semester_cards(
+        selected_student_data
+    )
+
+
+    # =====================================================
+    # COMPLETE COURSE RECORD
+    # =====================================================
+
+    st.markdown(
+        "## 📋 Complete Academic Record"
+    )
+
+
+    complete_columns = [
+
+        "ID Number",
+        "Name",
+        "Course Code",
+        "Course Name",
+        "AY",
+        "Semester",
+        "Academic Semester",
+        "Grade",
+        "Points",
+        "Credits",
+        "Category",
+        "Mentor Name"
+
+    ]
+
+
     available_columns = [
 
         col
-        for col in display_columns
+        for col in complete_columns
         if col in selected_student_data.columns
 
     ]
 
 
-    display_data = (
+    complete_data = (
         selected_student_data[
             available_columns
         ]
@@ -1265,33 +1685,27 @@ else:
     )
 
 
-    display_data = display_data.sort_values(
-        by="Academic Semester",
-        key=lambda x:
-        x.map(
-            lambda value:
-            semester_sort_key(value)
-        )
-    )
-
-
     st.dataframe(
-        display_data,
+        complete_data,
         use_container_width=True,
         hide_index=True
     )
 
 
     # =====================================================
-    # EXCEL DOWNLOAD
+    # DOWNLOAD SECTION
     # =====================================================
 
     st.markdown("---")
 
     st.markdown(
-        "## 📥 Download"
+        "## 📥 Download Reports"
     )
 
+
+    # =====================================================
+    # EXCEL DOWNLOAD
+    # =====================================================
 
     excel_buffer = BytesIO()
 
@@ -1305,6 +1719,27 @@ else:
             writer,
             index=False,
             sheet_name="Student Performance"
+        )
+
+
+        course_table.to_excel(
+            writer,
+            index=False,
+            sheet_name="Course Wise"
+        )
+
+
+        semester_summary_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="Semester Wise"
+        )
+
+
+        category_summary_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="Category Wise"
         )
 
 
@@ -1348,7 +1783,7 @@ else:
 
 
         title_style = ParagraphStyle(
-            "CustomTitle",
+            "TitleStyle",
             parent=styles["Title"],
             fontSize=18,
             alignment=TA_CENTER,
@@ -1357,16 +1792,16 @@ else:
 
 
         subtitle_style = ParagraphStyle(
-            "CustomSubtitle",
+            "SubtitleStyle",
             parent=styles["Normal"],
             fontSize=10,
             alignment=TA_CENTER,
-            spaceAfter=12
+            spaceAfter=10
         )
 
 
         heading_style = ParagraphStyle(
-            "CustomHeading",
+            "HeadingStyle",
             parent=styles["Heading2"],
             fontSize=13,
             spaceBefore=10,
@@ -1375,7 +1810,7 @@ else:
 
 
         normal_style = ParagraphStyle(
-            "CustomNormal",
+            "NormalStyle",
             parent=styles["Normal"],
             fontSize=8
         )
@@ -1408,7 +1843,7 @@ else:
                     Spacer(1, 5)
                 )
 
-            except:
+            except Exception:
 
                 pass
 
@@ -1441,6 +1876,11 @@ else:
         )
 
 
+        story.append(
+            Spacer(1, 8)
+        )
+
+
         # =================================================
         # STUDENT DETAILS
         # =================================================
@@ -1460,11 +1900,11 @@ else:
         ).strip()
 
 
-        # -------------------------------------------------
-        # MENTOR
-        # -------------------------------------------------
+        # =================================================
+        # PDF MENTOR
+        # =================================================
 
-        mentor_values = (
+        pdf_mentor_values = (
             student_data[
                 "Mentor Name"
             ]
@@ -1473,21 +1913,25 @@ else:
         )
 
 
-        mentor_values = mentor_values[
-            ~mentor_values.str.lower().isin(
-                [
-                    "",
-                    "nan",
-                    "none"
-                ]
-            )
-        ]
+        pdf_mentor_values = (
+            pdf_mentor_values[
+                ~pdf_mentor_values.str.lower().isin(
+                    [
+                        "",
+                        "nan",
+                        "none",
+                        "<na>",
+                        "not available"
+                    ]
+                )
+            ]
+        )
 
 
-        if not mentor_values.empty:
+        if not pdf_mentor_values.empty:
 
             pdf_mentor_name = (
-                mentor_values.iloc[0]
+                pdf_mentor_values.iloc[0]
             )
 
         else:
@@ -1501,6 +1945,10 @@ else:
             student_data
         )
 
+
+        # =================================================
+        # STUDENT INFORMATION TABLE
+        # =================================================
 
         student_info = [
 
@@ -1647,10 +2095,12 @@ else:
 
 
         category_rows = [
+
             [
                 "Category",
                 "Count"
             ]
+
         ]
 
 
@@ -1662,11 +2112,14 @@ else:
                 .sum()
             )
 
+
             category_rows.append(
+
                 [
                     category,
                     str(int(count))
                 ]
+
             )
 
 
@@ -1709,13 +2162,6 @@ else:
                     (1, 1),
                     (1, -1),
                     "CENTER"
-                ),
-
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE"
                 )
 
             ])
@@ -1744,18 +2190,24 @@ else:
         )
 
 
-        academic_data = student_data[
+        academic_data = (
             student_data[
-                "Academic Semester"
-            ].notna()
-        ].copy()
+                student_data[
+                    "Academic Semester"
+                ].notna()
+            ]
+            .copy()
+        )
 
 
-        academic_data = academic_data.sort_values(
-            by="Academic Semester",
-            key=lambda x:
-            x.map(
-                semester_sort_key
+        academic_data = (
+            academic_data
+            .sort_values(
+                by="Academic Semester",
+                key=lambda x:
+                x.map(
+                    semester_sort_key
+                )
             )
         )
 
@@ -1775,7 +2227,9 @@ else:
         ]
 
 
-        for _, row in academic_data.iterrows():
+        for _, row in (
+            academic_data.iterrows()
+        ):
 
             academic_rows.append(
 
@@ -1908,7 +2362,7 @@ else:
         )
 
 
-        semester_list = (
+        semester_list_pdf = (
             student_data[
                 "Academic Semester"
             ]
@@ -1918,8 +2372,8 @@ else:
         )
 
 
-        semester_list = sorted(
-            semester_list,
+        semester_list_pdf = sorted(
+            semester_list_pdf,
             key=semester_sort_key
         )
 
@@ -1936,7 +2390,7 @@ else:
         ]
 
 
-        for semester in semester_list:
+        for semester in semester_list_pdf:
 
             sem_data = student_data[
                 student_data[
@@ -1952,7 +2406,9 @@ else:
 
             total_credits = (
                 pd.to_numeric(
-                    sem_data["Credits"],
+                    sem_data[
+                        "Credits"
+                    ],
                     errors="coerce"
                 )
                 .fillna(0)
@@ -2029,13 +2485,6 @@ else:
                     (1, 1),
                     (-1, -1),
                     "CENTER"
-                ),
-
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE"
                 )
 
             ])
@@ -2089,6 +2538,7 @@ else:
                 )
             )
 
+
         else:
 
             backlog_data = (
@@ -2101,11 +2551,14 @@ else:
             )
 
 
-            backlog_data = backlog_data.sort_values(
-                by="Academic Semester",
-                key=lambda x:
-                x.map(
-                    semester_sort_key
+            backlog_data = (
+                backlog_data
+                .sort_values(
+                    by="Academic Semester",
+                    key=lambda x:
+                    x.map(
+                        semester_sort_key
+                    )
                 )
             )
 
@@ -2123,7 +2576,9 @@ else:
             ]
 
 
-            for _, row in backlog_data.iterrows():
+            for _, row in (
+                backlog_data.iterrows()
+            ):
 
                 backlog_rows.append(
 
@@ -2240,7 +2695,7 @@ else:
 
 
     # =====================================================
-    # PDF DOWNLOAD BUTTON
+    # PDF DOWNLOAD
     # =====================================================
 
     pdf_buffer = create_student_pdf(
