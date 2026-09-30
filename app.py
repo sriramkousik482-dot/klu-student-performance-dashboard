@@ -284,6 +284,13 @@ def load_data():
     mentor_rows = df[~is_student_row]
     df = df[is_student_row].copy()
 
+    # Keep only genuine course records: valid academic year (2025-2026) and a
+    # real course code (no spaces, has digits).  This drops stray rows such as
+    # marks tables where the course NAME sits in the Course Code column.
+    ay_ok = df["AY"].astype(str).str.strip().str.fullmatch(r"\d{4}-\d{2,4}")
+    code_ok = df["Course Code"].astype(str).str.strip().str.fullmatch(r"\S*\d\S*")
+    df = df[ay_ok & code_ok].copy()
+
     mentor_map = {}
     for sid, mname in zip(
         mentor_rows["Name"].astype(str).str.strip(),
@@ -633,63 +640,34 @@ else:
 
 
 # =========================================================
-# STUDENT SEARCH
+# STUDENT SEARCH  (single searchable box - no second "select" step)
 # =========================================================
 
 st.markdown("## Student Search")
 
-student_search = st.text_input(
-    "Search by Student ID or Name", placeholder="Enter Student ID or Name"
+student_list = (
+    filtered_df[["ID Number", "Name"]]
+    .drop_duplicates(subset="ID Number")
+    .sort_values("ID Number")
+)
+student_options = [
+    f"{sid} - {name}"
+    for sid, name in zip(student_list["ID Number"], student_list["Name"])
+]
+
+selected_option = st.selectbox(
+    "Search by Student ID or Name",
+    student_options,
+    index=None,
+    placeholder="Type a Student ID or Name and press Enter",
 )
 
 selected_student_data = None
-
-if student_search.strip():
-    search_text = student_search.strip().lower()
-
-    student_matches = filtered_df[
-        filtered_df["ID Number"].astype(str).str.lower().str.contains(
-            search_text, na=False, regex=False)
-        | filtered_df["Name"].astype(str).str.lower().str.contains(
-            search_text, na=False, regex=False)
+if selected_option:
+    selected_id = selected_option.split(" - ", 1)[0]
+    selected_student_data = filtered_df[
+        filtered_df["ID Number"].astype(str) == selected_id
     ].copy()
-
-    if student_matches.empty:
-        st.warning("No student found for this search.")
-    else:
-        options_df = (
-            student_matches[["ID Number", "Name"]]
-            .drop_duplicates()
-            .sort_values("ID Number")
-        )
-
-        selected_id = None
-
-        exact = options_df[options_df["ID Number"].str.lower() == search_text]
-
-        if len(exact) == 1:
-            # typed a full student ID -> open it directly
-            selected_id = exact["ID Number"].iloc[0]
-        elif len(options_df) == 1:
-            # only one student matches -> open it directly
-            selected_id = options_df["ID Number"].iloc[0]
-        else:
-            # several students match -> let the user pick
-            student_options = [
-                f"{r['ID Number']} - {r['Name']}" for _, r in options_df.iterrows()
-            ]
-            selected_option = st.selectbox(
-                f"{len(student_options)} students found - select one",
-                student_options, index=None,
-                placeholder="Select a student",
-            )
-            if selected_option:
-                selected_id = selected_option.split(" - ", 1)[0]
-
-        if selected_id is not None:
-            selected_student_data = student_matches[
-                student_matches["ID Number"].astype(str) == selected_id
-            ].copy()
 
 
 # =========================================================
