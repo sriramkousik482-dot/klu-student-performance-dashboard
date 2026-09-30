@@ -276,6 +276,22 @@ def load_data():
         st.write(list(df.columns))
         st.stop()
 
+    # The CSV has a second table appended at the bottom (mentor list):
+    #   ID Number = "Y-25", Name = student ID, Course Code = student name,
+    #   Grade = mentor name.  Separate it from the academic records.
+    id_text = df["ID Number"].astype(str).str.strip()
+    is_student_row = id_text.str.fullmatch(r"\d{10}")
+    mentor_rows = df[~is_student_row]
+    df = df[is_student_row].copy()
+
+    mentor_map = {}
+    for sid, mname in zip(
+        mentor_rows["Name"].astype(str).str.strip(),
+        mentor_rows["Grade"].astype(str).str.strip(),
+    ):
+        if len(sid) == 10 and sid.isdigit() and mname.lower() not in ("", "nan", "none"):
+            mentor_map[sid] = mname
+
     for col in ["ID Number", "Name", "Course Code", "Course Name", "Grade", "AY"]:
         df[col] = df[col].astype(str).str.strip()
 
@@ -296,7 +312,7 @@ def load_data():
             ["nan", "NaN", "None", "none", "NONE", "<NA>", "N/A", "NA"], ""
         )
     else:
-        df["Mentor Name"] = ""
+        df["Mentor Name"] = df["ID Number"].map(mentor_map).fillna("")
 
     marks_column = find_marks_column(df)
     if marks_column is not None:
@@ -646,17 +662,31 @@ if student_search.strip():
             .drop_duplicates()
             .sort_values("ID Number")
         )
-        student_options = [
-            f"{r['ID Number']} - {r['Name']}" for _, r in options_df.iterrows()
-        ]
 
-        selected_option = st.selectbox(
-            "Select Student", student_options, index=None,
-            placeholder="Select a student",
-        )
+        selected_id = None
 
-        if selected_option:
-            selected_id = selected_option.split(" - ", 1)[0]
+        exact = options_df[options_df["ID Number"].str.lower() == search_text]
+
+        if len(exact) == 1:
+            # typed a full student ID -> open it directly
+            selected_id = exact["ID Number"].iloc[0]
+        elif len(options_df) == 1:
+            # only one student matches -> open it directly
+            selected_id = options_df["ID Number"].iloc[0]
+        else:
+            # several students match -> let the user pick
+            student_options = [
+                f"{r['ID Number']} - {r['Name']}" for _, r in options_df.iterrows()
+            ]
+            selected_option = st.selectbox(
+                f"{len(student_options)} students found - select one",
+                student_options, index=None,
+                placeholder="Select a student",
+            )
+            if selected_option:
+                selected_id = selected_option.split(" - ", 1)[0]
+
+        if selected_id is not None:
             selected_student_data = student_matches[
                 student_matches["ID Number"].astype(str) == selected_id
             ].copy()
