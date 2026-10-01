@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from pathlib import Path
 from io import BytesIO
 
@@ -33,44 +34,168 @@ if not CSV_FILE.exists():
 
 
 # =========================================================
-# STYLES (HOME PAGE)
+# THEME / STYLES
 # =========================================================
+
+TEXT = "#e6e9f5"
+MUTED = "#8e98b8"
+CARD = "#141b34"
+BORDER = "#263056"
+
+PALETTE = ["#6366f1", "#22d3ee", "#34d399", "#fbbf24", "#fb7185", "#a78bfa", "#fb923c"]
+
+GRADE_ORDER = ["O", "A+", "A", "B+", "B", "C", "P", "F", "DT"]
+GRADE_COLORS = {
+    "O": "#34d399", "A+": "#4ade80", "A": "#22d3ee", "B+": "#38bdf8",
+    "B": "#818cf8", "C": "#a78bfa", "P": "#fbbf24", "F": "#fb7185", "DT": "#ef4444",
+}
 
 st.markdown(
     """
 <style>
-.block-container {padding-top: 2rem;}
+.stApp {
+    background:
+        radial-gradient(1200px 500px at 10% -10%, #1b2352 0%, transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, #2a1650 0%, transparent 55%),
+        #0b1020;
+}
+.block-container {padding-top: 1.6rem; max-width: 1400px;}
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #121a3a 0%, #0d1330 100%);
+    border-right: 1px solid #263056;
+}
+h2 {color: #e6e9f5 !important; font-weight: 700 !important;}
+
 .hero {
-    background: linear-gradient(135deg, #1e3a8a, #7c3aed);
-    padding: 28px 32px; border-radius: 16px; margin-bottom: 24px;
+    background: linear-gradient(120deg, #4f46e5 0%, #7c3aed 45%, #db2777 100%);
+    padding: 30px 36px; border-radius: 20px; margin-bottom: 26px;
+    box-shadow: 0 10px 40px rgba(99,102,241,.35);
+    position: relative; overflow: hidden;
 }
-.hero h1 {color: white; margin: 0; font-size: 34px;}
-.hero p  {color: #e0e7ff; margin: 6px 0 0 0; font-size: 16px;}
+.hero:after {
+    content: "🎓"; position: absolute; right: 34px; top: 8px;
+    font-size: 110px; opacity: .18;
+}
+.hero h1 {color: #fff; margin: 0; font-size: 36px; letter-spacing: .5px;}
+.hero p  {color: #e9e7ff; margin: 8px 0 0 0; font-size: 16px;}
+.hero .tag {
+    display:inline-block; margin-top: 14px; padding: 4px 12px; font-size: 12px;
+    background: rgba(255,255,255,.18); color:#fff; border-radius: 999px;
+}
+
+.section-title {
+    color: #e6e9f5; font-size: 22px; font-weight: 700; margin: 26px 0 12px 0;
+    display:flex; align-items:center; gap:10px;
+}
+.section-title:before {
+    content:""; width: 6px; height: 22px; border-radius: 4px;
+    background: linear-gradient(180deg, #6366f1, #22d3ee);
+}
+
 .kpi {
-    background: #1a1f2e; border: 1px solid #2b3245;
-    border-left: 5px solid var(--c);
-    border-radius: 12px; padding: 16px 18px;
+    background: linear-gradient(145deg, #171f3d 0%, #121931 100%);
+    border: 1px solid #263056; border-radius: 16px;
+    padding: 16px 18px; position: relative; overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
 }
-.kpi .label {color: #9ca3af; font-size: 13px; letter-spacing: .5px;}
-.kpi .value {color: white; font-size: 26px; font-weight: 700;}
+.kpi:before {
+    content:""; position:absolute; left:0; top:0; right:0; height:4px;
+    background: var(--c);
+}
+.kpi:after {
+    content:""; position:absolute; right:-30px; top:-30px; width:100px; height:100px;
+    border-radius:50%; background: var(--c); opacity:.12;
+}
+.kpi .icon  {font-size: 20px; margin-bottom: 4px;}
+.kpi .label {color:#8e98b8; font-size: 11.5px; letter-spacing: .8px; font-weight:600;}
+.kpi .value {color:#fff; font-size: 28px; font-weight: 800; line-height: 1.15;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.kpi .sub   {color: var(--c); font-size: 12px; margin-top: 2px;}
+
+.panel {
+    background: #141b34; border: 1px solid #263056; border-radius: 16px;
+    padding: 14px 18px 4px 18px; margin-bottom: 8px;
+}
+.panel h4 {margin: 0 0 4px 0; color:#e6e9f5; font-size: 16px;}
+.panel small {color:#8e98b8;}
+
+.profile {
+    display:flex; align-items:center; gap:22px;
+    background: linear-gradient(120deg, #1a2150, #2a1b55);
+    border: 1px solid #343f78; border-radius: 20px; padding: 22px 26px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+}
+.avatar {
+    width: 74px; height: 74px; border-radius: 50%; flex: none;
+    background: linear-gradient(135deg, #22d3ee, #6366f1, #db2777);
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size: 28px; font-weight: 800;
+}
+.profile .name {color:#fff; font-size: 24px; font-weight: 800;}
+.profile .meta {color:#b8c0e0; font-size: 14px; margin-top: 4px;}
+.chip {
+    display:inline-block; padding: 3px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; margin-top: 8px; margin-right: 6px;
+}
+.chip.good {background: rgba(52,211,153,.18); color:#34d399;}
+.chip.warn {background: rgba(251,191,36,.18); color:#fbbf24;}
+.chip.info {background: rgba(129,140,248,.2); color:#a5b4fc;}
+.profile .cgpa {margin-left:auto; text-align:center;}
+.profile .cgpa .n {font-size: 44px; font-weight: 800; color:#22d3ee; line-height:1;}
+.profile .cgpa .l {font-size: 11px; color:#b8c0e0; letter-spacing: 1px;}
+
+.ccard {
+    background: #141b34; border: 1px solid #263056; border-left: 5px solid var(--g);
+    border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; min-height: 96px;
+}
+.ccard .code {font-size: 13px; font-weight: 700; color:#e6e9f5;}
+.ccard .nm {font-size: 11px; color:#aab3d1; margin: 3px 0 7px 0; line-height: 1.25;}
+.ccard .row {display:flex; gap:6px; flex-wrap:wrap; align-items:center;}
+.ccard .g {
+    background: var(--g); color:#0b1020; font-weight: 800; font-size: 12px;
+    padding: 1px 9px; border-radius: 6px;
+}
+.ccard .m {font-size: 10.5px; color:#8e98b8;}
+
+[data-baseweb="tab-list"] {gap: 6px;}
+[data-baseweb="tab"] {border-radius: 10px 10px 0 0;}
 </style>
 
 <div class="hero">
-    <h1>🎓 KL UNIVERSITY</h1>
+    <h1>KL UNIVERSITY</h1>
     <p>Department of CSE-4 &nbsp;|&nbsp; Academic Performance Dashboard</p>
+    <span class="tag">Student analytics &amp; reports</span>
 </div>
 """,
     unsafe_allow_html=True,
 )
 
 
-def kpi_card(label, value, color):
+def section(title):
+    st.markdown(f'<div class="section-title">{title}</div>', unsafe_allow_html=True)
+
+
+def kpi_card(label, value, color, icon="", sub=""):
     st.markdown(
         f"""<div class="kpi" style="--c:{color}">
+            <div class="icon">{icon}</div>
             <div class="label">{label}</div>
             <div class="value">{value}</div>
+            <div class="sub">{sub}&nbsp;</div>
         </div>""",
         unsafe_allow_html=True,
+    )
+
+
+def style_chart(chart, height=300):
+    return (
+        chart.properties(height=height, background="transparent")
+        .configure_view(strokeWidth=0)
+        .configure_axis(
+            labelColor="#aab3d1", titleColor="#aab3d1", gridColor="#222b4c",
+            domainColor="#222b4c", tickColor="#222b4c",
+        )
+        .configure_legend(labelColor="#aab3d1", titleColor="#aab3d1")
     )
 
 
@@ -339,21 +464,18 @@ def load_data():
 # =========================================================
 
 def show_course_card(row):
+    g = str(row["Grade"]).strip().upper().split("(")[0].strip()
+    color = GRADE_COLORS.get(g, "#94a3b8")
     st.markdown(
         f"""
-        <div style="border:1px solid #d8d8d8; border-radius:7px; padding:7px 9px;
-                    margin-bottom:6px; background:white; color:#111; min-height:80px;">
-            <div style="font-size:13px; font-weight:600; margin-bottom:3px;">
-                {row["Course Code"]}
-            </div>
-            <div style="font-size:11px; margin-bottom:4px; line-height:1.2;">
-                {row["Course Name"]}
-            </div>
-            <div style="font-size:10px; color:#555; line-height:1.2;">
-                Grade: <b>{row["Grade"]}</b> &nbsp;|&nbsp;
-                Category: <b>{row["Category"]}</b> &nbsp;|&nbsp;
-                Points: <b>{row["Points"]}</b> &nbsp;|&nbsp;
-                Credits: <b>{row["Credits"]}</b>
+        <div class="ccard" style="--g:{color}">
+            <div class="code">{row["Course Code"]}</div>
+            <div class="nm">{row["Course Name"]}</div>
+            <div class="row">
+                <span class="g">{row["Grade"]}</span>
+                <span class="m">Pts {row["Points"]:g}</span>
+                <span class="m">• Cr {row["Credits"]:g}</span>
+                <span class="m">• {row["Category"]}</span>
             </div>
         </div>
         """,
@@ -567,7 +689,7 @@ except Exception as error:
 # SIDEBAR FILTERS
 # =========================================================
 
-st.sidebar.header("Filters")
+st.sidebar.markdown("### 🎛️ Filters")
 
 selected_year = st.sidebar.selectbox(
     "Joining Year",
@@ -590,12 +712,15 @@ if selected_course_code != "All":
 if selected_course_name != "All":
     filtered_df = filtered_df[filtered_df["Course Name"] == selected_course_name]
 
+st.sidebar.caption(f"{len(filtered_df):,} course records • "
+                   f"{filtered_df['ID Number'].nunique():,} students")
+
 
 # =========================================================
 # DEPARTMENT SUMMARY (HOME)
 # =========================================================
 
-st.markdown("## Overall Department Summary")
+section("Overall Department Summary")
 
 if filtered_df.empty:
     st.warning("No records match the selected filters.")
@@ -611,39 +736,114 @@ else:
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
     with k1:
-        kpi_card("TOTAL STUDENTS", f"{total_students:,}", "#3b82f6")
+        kpi_card("TOTAL STUDENTS", f"{total_students:,}", "#6366f1", "👥", "enrolled")
     with k2:
-        kpi_card("AVERAGE CGPA", f"{department_cgpa:.2f}", "#8b5cf6")
+        kpi_card("AVERAGE CGPA", f"{department_cgpa:.2f}", "#a78bfa", "⭐", "out of 10")
     with k3:
-        kpi_card("TOTAL PASSED", f"{pass_courses:,}", "#22c55e")
+        kpi_card("TOTAL PASSED", f"{pass_courses:,}", "#34d399", "✅", "courses")
     with k4:
-        kpi_card("TOTAL FAILED", f"{fail_courses:,}", "#f97316")
+        kpi_card("TOTAL FAILED", f"{fail_courses:,}", "#fb923c", "❌", "courses")
     with k5:
-        kpi_card("BACKLOG STUDENTS", f"{students_with_backlog:,}", "#f59e0b")
+        kpi_card("BACKLOG STUDENTS", f"{students_with_backlog:,}", "#fbbf24", "⚠️",
+                 f"{students_with_backlog / max(total_students, 1):.0%} of students")
     with k6:
-        kpi_card("DETAINED", f"{dt_courses:,}", "#ef4444")
+        kpi_card("DETAINED", f"{dt_courses:,}", "#fb7185", "🚫", "courses")
+
+    # per-student table
+    per_student = (
+        filtered_df.groupby("ID Number")
+        .agg(Name=("Name", "first"), Year=("Year", "first"),
+             CP=("Credit Points", "sum"), CR=("Credits", "sum"))
+        .reset_index()
+    )
+    per_student["CGPA"] = (per_student["CP"] / per_student["CR"].where(per_student["CR"] > 0)).round(2)
+    per_student = per_student.dropna(subset=["CGPA"])
 
     st.write("")
+    c1, c2 = st.columns([3, 2])
 
-    c1, c2 = st.columns(2)
     with c1:
-        st.markdown("#### Grade Distribution")
-        grade_order = ["O", "A+", "A", "B+", "B", "C", "P", "F", "DT"]
-        gc = base.value_counts().reindex(grade_order).dropna()
-        st.bar_chart(gc, height=280)
+        st.markdown('<div class="panel"><h4>Grade Distribution</h4>'
+                    '<small>Final grade of every course record</small></div>',
+                    unsafe_allow_html=True)
+        gc = base.value_counts().reset_index()
+        gc.columns = ["Grade", "Count"]
+        gc = gc[gc["Grade"].isin(GRADE_ORDER)]
+        chart = (
+            alt.Chart(gc)
+            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+            .encode(
+                x=alt.X("Grade:N", sort=GRADE_ORDER, title=None,
+                        axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("Count:Q", title="Courses"),
+                color=alt.Color(
+                    "Grade:N", legend=None,
+                    scale=alt.Scale(domain=list(GRADE_COLORS),
+                                    range=list(GRADE_COLORS.values())),
+                ),
+                tooltip=["Grade", "Count"],
+            )
+        )
+        st.altair_chart(style_chart(chart, 300), use_container_width=True)
+
     with c2:
-        st.markdown("#### Students by Joining Year")
-        yc = filtered_df.groupby("Year")["ID Number"].nunique().sort_index()
-        st.bar_chart(yc, height=280)
+        st.markdown('<div class="panel"><h4>Students by Joining Year</h4>'
+                    '<small>Share of each batch</small></div>',
+                    unsafe_allow_html=True)
+        yc = per_student.groupby("Year").size().reset_index(name="Students")
+        yc = yc[yc["Year"] != ""]
+        donut = (
+            alt.Chart(yc)
+            .mark_arc(innerRadius=70, outerRadius=115, cornerRadius=6)
+            .encode(
+                theta="Students:Q",
+                color=alt.Color("Year:N", scale=alt.Scale(range=PALETTE),
+                                legend=alt.Legend(title=None, orient="bottom")),
+                tooltip=["Year", "Students"],
+            )
+        )
+        st.altair_chart(style_chart(donut, 300), use_container_width=True)
 
-    st.markdown("---")
+    c3, c4 = st.columns([3, 2])
+
+    with c3:
+        st.markdown('<div class="panel"><h4>CGPA Distribution</h4>'
+                    '<small>Number of students in each CGPA band</small></div>',
+                    unsafe_allow_html=True)
+        hist = (
+            alt.Chart(per_student)
+            .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5, color="#8b5cf6")
+            .encode(
+                x=alt.X("CGPA:Q", bin=alt.Bin(step=0.5), title="CGPA"),
+                y=alt.Y("count()", title="Students"),
+                tooltip=[alt.Tooltip("count()", title="Students")],
+            )
+        )
+        st.altair_chart(style_chart(hist, 300), use_container_width=True)
+
+    with c4:
+        st.markdown('<div class="panel"><h4>🏆 Top 10 Students</h4>'
+                    '<small>Highest overall CGPA</small></div>',
+                    unsafe_allow_html=True)
+        top10 = (
+            per_student[per_student["CR"] >= 20]
+            .sort_values("CGPA", ascending=False)
+            .head(10)[["ID Number", "Name", "CGPA"]]
+        )
+        st.dataframe(
+            top10, hide_index=True, use_container_width=True, height=318,
+            column_config={
+                "CGPA": st.column_config.ProgressColumn(
+                    "CGPA", min_value=0, max_value=10, format="%.2f"),
+            },
+        )
 
 
 # =========================================================
-# STUDENT SEARCH  (single searchable box - no second "select" step)
+# STUDENT SEARCH  (single searchable box)
 # =========================================================
 
-st.markdown("## Student Search")
+section("Student Search")
 
 student_list = (
     filtered_df[["ID Number", "Name"]]
@@ -659,7 +859,7 @@ selected_option = st.selectbox(
     "Search by Student ID or Name",
     student_options,
     index=None,
-    placeholder="Type a Student ID or Name and press Enter",
+    placeholder="🔍  Type a Student ID or Name and press Enter",
 )
 
 selected_student_data = None
@@ -680,83 +880,125 @@ if selected_student_data is not None and not selected_student_data.empty:
     student_name = str(selected_student_data["Name"].iloc[0])
     mentor_name = get_mentor_name(selected_student_data)
     student_cgpa = calculate_cgpa(selected_student_data)
-
-    st.markdown("## Student Details")
-    d1, d2, d3, d4 = st.columns(4)
-    with d1:
-        kpi_card("STUDENT ID", student_id, "#3b82f6")
-    with d2:
-        kpi_card("STUDENT NAME", student_name.title(), "#8b5cf6")
-    with d3:
-        kpi_card("MENTOR", mentor_name, "#14b8a6")
-    with d4:
-        kpi_card("OVERALL CGPA", f"{student_cgpa:.2f}", "#f59e0b")
-
-    # Academic summary
-    st.markdown("## Academic Summary")
     pass_count, fail_count, detained_count = grade_counts(selected_student_data)
+    total_credits = pd.to_numeric(
+        selected_student_data["Credits"], errors="coerce").fillna(0).sum()
+    sem_df = semester_summary(selected_student_data)
 
-    a1, a2, a3, a4 = st.columns(4)
+    initials = "".join(w[0] for w in student_name.split()[:2]).upper()
+    joined = selected_student_data["Year"].iloc[0]
+    if fail_count + detained_count > 0:
+        status = '<span class="chip warn">⚠ Has backlogs</span>'
+    else:
+        status = '<span class="chip good">✓ All clear</span>'
+
+    st.markdown(
+        f"""
+        <div class="profile">
+            <div class="avatar">{initials}</div>
+            <div>
+                <div class="name">{student_name.title()}</div>
+                <div class="meta">ID: {student_id} &nbsp;•&nbsp; Mentor: {mentor_name}</div>
+                {status}<span class="chip info">Batch {joined}</span>
+            </div>
+            <div class="cgpa"><div class="n">{student_cgpa:.2f}</div>
+                 <div class="l">OVERALL CGPA</div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.write("")
+    a1, a2, a3, a4, a5 = st.columns(5)
     with a1:
-        kpi_card("OVERALL CGPA", f"{student_cgpa:.2f}", "#8b5cf6")
+        kpi_card("COURSES", len(selected_student_data), "#6366f1", "📚")
     with a2:
-        kpi_card("PASS", pass_count, "#22c55e")
+        kpi_card("CREDITS", f"{total_credits:g}", "#22d3ee", "🎯")
     with a3:
-        kpi_card("FAIL", fail_count, "#f59e0b")
+        kpi_card("PASS", pass_count, "#34d399", "✅")
     with a4:
-        kpi_card("DETAINED", detained_count, "#ef4444")
+        kpi_card("FAIL", fail_count, "#fb923c", "❌")
+    with a5:
+        kpi_card("DETAINED", detained_count, "#fb7185", "🚫")
 
     # Semester-wise CGPA graph
-    st.markdown("## Semester-wise CGPA")
-    sem_df = semester_summary(selected_student_data)
+    section("Semester-wise CGPA")
     if not sem_df.empty:
-        st.line_chart(sem_df.set_index("Semester")[["CGPA"]], height=300)
+        enc = alt.Chart(sem_df).encode(
+            x=alt.X("Semester:N", sort=None, title="Semester",
+                    axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("CGPA:Q", scale=alt.Scale(domain=[0, 10])),
+            tooltip=["Semester", "CGPA", "Total Courses", "Total Credits"],
+        )
+        layered = (
+            enc.mark_area(opacity=0.22, color="#6366f1")
+            + enc.mark_line(color="#818cf8", strokeWidth=3)
+            + enc.mark_point(filled=True, size=130, color="#22d3ee")
+            + enc.mark_text(dy=-16, color="#e6e9f5", fontWeight="bold").encode(
+                text=alt.Text("CGPA:Q", format=".2f"))
+        )
+        st.altair_chart(style_chart(layered, 320), use_container_width=True)
     else:
         st.info("Semester-wise CGPA data is not available.")
 
-    # Course-wise data
-    st.markdown("## Course-wise Academic Data")
+    category_summary_df = category_summary(selected_student_data)
+
     course_data = selected_student_data[
         ["Course Code", "Course Name", "Academic Semester",
          "Grade", "Points", "Credits", "Category"]
     ].copy()
     course_data["_sort"] = course_data["Academic Semester"].map(semester_sort_key)
     course_data = course_data.sort_values("_sort").drop(columns=["_sort"])
-    st.dataframe(course_data, use_container_width=True, hide_index=True)
 
-    # Semester summary table
-    st.markdown("## Semester-wise Summary")
-    st.dataframe(sem_df, use_container_width=True, hide_index=True)
-
-    # Category summary
-    st.markdown("## Category-wise Summary")
-    category_summary_df = category_summary(selected_student_data)
-    st.dataframe(category_summary_df, use_container_width=True, hide_index=True)
-
-    # Cards
-    st.markdown("## Semester-wise Academic Performance")
-    for semester in get_semesters(selected_student_data):
-        st.markdown(f"### {semester}")
-        semester_data = selected_student_data[
-            selected_student_data["Academic Semester"] == semester
-        ]
-        card_columns = st.columns(4)
-        for index, (_, row) in enumerate(semester_data.iterrows()):
-            with card_columns[index % 4]:
-                show_course_card(row)
-
-    # Complete record
-    st.markdown("## Complete Academic Record")
     complete_data = selected_student_data[[
         "ID Number", "Name", "Course Code", "Course Name", "AY", "Semester",
         "Academic Semester", "Grade", "Points", "Credits", "Category",
         "Mentor Name",
     ]].copy()
-    st.dataframe(complete_data, use_container_width=True, hide_index=True)
+
+    section("Academic Details")
+    tab_cards, tab_courses, tab_summary, tab_full = st.tabs(
+        ["🗂️ Semester Cards", "📋 Course Table", "📊 Summaries", "🧾 Full Record"]
+    )
+
+    with tab_cards:
+        for semester in get_semesters(selected_student_data):
+            sem_row = sem_df[sem_df["Semester"] == semester].iloc[0]
+            st.markdown(
+                f"#### Semester {semester} "
+                f"<span class='chip info'>CGPA {sem_row['CGPA']:.2f}</span>",
+                unsafe_allow_html=True,
+            )
+            semester_data = selected_student_data[
+                selected_student_data["Academic Semester"] == semester
+            ]
+            card_columns = st.columns(4)
+            for index, (_, row) in enumerate(semester_data.iterrows()):
+                with card_columns[index % 4]:
+                    show_course_card(row)
+
+    with tab_courses:
+        st.dataframe(course_data, use_container_width=True, hide_index=True)
+
+    with tab_summary:
+        s1, s2 = st.columns(2)
+        with s1:
+            st.markdown("##### Semester-wise Summary")
+            st.dataframe(
+                sem_df, use_container_width=True, hide_index=True,
+                column_config={"CGPA": st.column_config.ProgressColumn(
+                    "CGPA", min_value=0, max_value=10, format="%.2f")},
+            )
+        with s2:
+            st.markdown("##### Category-wise Summary")
+            st.dataframe(category_summary_df, use_container_width=True, hide_index=True)
+
+    with tab_full:
+        st.dataframe(complete_data, use_container_width=True, hide_index=True)
 
     # Export
-    st.markdown("## Export")
-    export_col1, export_col2 = st.columns(2)
+    section("Export")
+    export_col1, export_col2, _ = st.columns([1, 1, 3])
 
     excel_buffer = BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
@@ -771,6 +1013,7 @@ if selected_student_data is not None and not selected_student_data.empty:
             data=excel_buffer,
             file_name=f"{student_id}_Academic_Performance.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
         )
 
     pdf_buffer = generate_pdf(selected_student_data)
@@ -780,10 +1023,8 @@ if selected_student_data is not None and not selected_student_data.empty:
             data=pdf_buffer,
             file_name=f"{student_id}_Academic_Performance.pdf",
             mime="application/pdf",
+            use_container_width=True,
         )
 
 else:
-    st.markdown("---")
-    st.info(
-        "Search and select a student above to view individual academic performance."
-    )
+    st.info("Search and select a student above to view individual academic performance.")
