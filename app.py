@@ -462,6 +462,41 @@ def load_data():
     return df
 
 
+@st.cache_data
+def load_marks():
+    """In-sem marks table stored at the bottom of student.csv.
+
+    In those rows:  Name -> course code, Course Code -> course name,
+    Course Name -> Mid 1 (/25), Grade -> Mid 2 (/25), Points -> Total (/50).
+    """
+    raw = pd.read_csv(CSV_FILE, low_memory=False, encoding="utf-8-sig")
+    raw.columns = [str(c).strip() for c in raw.columns]
+
+    ids = raw["ID Number"].astype(str).str.strip()
+    code = raw["Name"].astype(str).str.strip()
+    mid1 = pd.to_numeric(raw["Course Name"], errors="coerce")
+    mid2 = pd.to_numeric(raw["Grade"], errors="coerce")
+    total = pd.to_numeric(raw["Points"], errors="coerce")
+
+    is_marks = (
+        ids.str.fullmatch(r"\d{10}")
+        & raw["AY"].isna()
+        & code.str.fullmatch(r"\S*\d\S*")
+        & (mid1.notna() | mid2.notna())
+    )
+
+    out = pd.DataFrame({
+        "ID Number": ids[is_marks],
+        "Course Code": code[is_marks],
+        "Course Name": raw["Course Code"][is_marks].astype(str).str.strip(),
+        "Mid 1": mid1[is_marks],
+        "Mid 2": mid2[is_marks],
+        "Total": total[is_marks],
+    })
+    out["Total"] = out["Total"].fillna(out["Mid 1"].fillna(0) + out["Mid 2"].fillna(0))
+    return out.drop_duplicates(["ID Number", "Course Code"], keep="last").reset_index(drop=True)
+
+
 # =========================================================
 # COURSE CARD
 # =========================================================
@@ -511,7 +546,7 @@ def _rounded_table(data, col_widths, radius=8):
         return Table(data, colWidths=col_widths)
 
 
-def generate_pdf(student_data):
+def generate_pdf(student_data, marks_df=None):
     buffer = BytesIO()
     page_w, page_h = A4
     margin = 30
@@ -708,6 +743,26 @@ def generate_pdf(student_data):
     kpi_table.setStyle(TableStyle(cmds))
     story.append(kpi_table)
 
+    # ---------------- In-Sem marks ----------------
+    story += section_heading("In-Sem Marks (Out of 50)")
+    if marks_df is not None and not marks_df.empty:
+        def fmt(v):
+            return "-" if pd.isna(v) else f"{float(v):g}"
+
+        rows = [[head("Course Code"), head("Course Name", False),
+                 head("Mid 1 (25)"), head("Mid 2 (25)"), head("Total (50)")]]
+        for _, r in marks_df.iterrows():
+            rows.append([
+                cell(r["Course Code"], True), cell(r["Course Name"]),
+                cell(fmt(r["Mid 1"]), True), cell(fmt(r["Mid 2"]), True),
+                cell(fmt(r["Total"]), True, True, "#4f46e5"),
+            ])
+        story.append(data_table(
+            rows, [1.0 * inch, 3.2 * inch, 1.0 * inch, 1.0 * inch, 1.0 * inch]))
+    else:
+        story.append(cell("No in-sem marks are recorded for this student in student.csv.", color="#6b7280"))
+
+
     # ---------------- Semester CGPA chart ----------------
     sem_df = semester_summary(student_data)
     if not sem_df.empty:
@@ -813,31 +868,6 @@ def generate_pdf(student_data):
         ]))
         story.append(ok)
 
-    # ---------------- Marks ----------------
-    marks_data = student_data[
-        student_data["Semester"].astype(str).str.strip().str.lower() != "summer term"
-    ].copy()
-    marks_data = marks_data[
-        marks_data["Academic Semester"].notna()
-        & (marks_data["Academic Semester"].astype(str).str.strip() != "")
-    ].copy()
-    marks_data["_sort"] = marks_data["Academic Semester"].map(semester_sort_key)
-    marks_data = marks_data.sort_values("_sort")
-
-    story += section_heading("Marks of All Members")
-    if not marks_data.empty and marks_data["Marks"].notna().any():
-        rows = [[head("Semester"), head("Course Code"), head("Course Name", False),
-                 head("Marks (Out of 50)")]]
-        for _, r in marks_data.iterrows():
-            m = r["Marks"]
-            display = "-" if pd.isna(m) else f"{float(m):g}"
-            rows.append([cell(r["Academic Semester"], True), cell(r["Course Code"], True),
-                         cell(r["Course Name"]), cell(display, True, True)])
-        story.append(data_table(
-            rows, [1.0 * inch, 1.2 * inch, 3.3 * inch, 1.6 * inch]))
-    else:
-        story.append(cell("Marks are not available.", color="#6b7280"))
-
     document.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
     buffer.seek(0)
     return buffer
@@ -849,6 +879,7 @@ def generate_pdf(student_data):
 
 try:
     df = load_data()
+    marks_all = load_marks()
 except Exception as error:
     st.error("There was an error while loading the CSV.")
     st.exception(error)
@@ -1054,6 +1085,10 @@ if selected_student_data is not None and not selected_student_data.empty:
     total_credits = pd.to_numeric(
         selected_student_data["Credits"], errors="coerce").fillna(0).sum()
     sem_df = semester_summary(selected_student_data)
+    marks_student = (
+        marks_all[marks_all["ID Number"] == student_id]
+        .sort_values("Course Code").reset_index(drop=True)
+    )
 
     initials = "".join(w[0] for w in student_name.split()[:2]).upper()
     joined = selected_student_data["Year"].iloc[0]
@@ -1127,9 +1162,58 @@ if selected_student_data is not None and not selected_student_data.empty:
     ]].copy()
 
     section("Academic Details")
-    tab_cards, tab_courses, tab_summary, tab_full = st.tabs(
-        ["🗂️ Semester Cards", "📋 Course Table", "📊 Summaries", "🧾 Full Record"]
+    tab_cards, tab_marks, tab_courses, tab_summary, tab_full = st.tabs(
+        ["🗂️ Semester Cards", "📝 In-Sem Marks", "📋 Course Table",
+         "📊 Summaries", "🧾 Full Record"]
     )
+
+    with tab_marks:
+        if marks_student.empty:
+            st.info("In-sem marks are not available for this student.")
+        else:
+            avg_total = marks_student["Total"].mean()
+            best = marks_student.loc[marks_student["Total"].idxmax()]
+            low = marks_student.loc[marks_student["Total"].idxmin()]
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                kpi_card("AVERAGE (OUT OF 50)", f"{avg_total:.1f}", "#6366f1", "📝",
+                         f"{len(marks_student)} courses")
+            with m2:
+                kpi_card("HIGHEST", f"{best['Total']:g}", "#34d399", "🏅", best["Course Code"])
+            with m3:
+                kpi_card("LOWEST", f"{low['Total']:g}", "#fb7185", "📉", low["Course Code"])
+
+            st.write("")
+            long = marks_student.melt(
+                id_vars=["Course Code", "Course Name"], value_vars=["Mid 1", "Mid 2"],
+                var_name="Test", value_name="Marks",
+            )
+            mchart = (
+                alt.Chart(long)
+                .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+                .encode(
+                    x=alt.X("Course Code:N", sort=None, title=None,
+                            axis=alt.Axis(labelAngle=-30)),
+                    y=alt.Y("Marks:Q", title="Marks (Mid 1 + Mid 2)",
+                            scale=alt.Scale(domain=[0, 50])),
+                    color=alt.Color("Test:N", scale=alt.Scale(
+                        domain=["Mid 1", "Mid 2"], range=["#6366f1", "#22d3ee"]),
+                        legend=alt.Legend(title=None, orient="top")),
+                    tooltip=["Course Code", "Course Name", "Test", "Marks"],
+                )
+            )
+            st.altair_chart(style_chart(mchart, 300), use_container_width=True)
+
+            st.dataframe(
+                marks_student[["Course Code", "Course Name", "Mid 1", "Mid 2", "Total"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "Mid 1": st.column_config.NumberColumn("Mid 1 (25)", format="%g"),
+                    "Mid 2": st.column_config.NumberColumn("Mid 2 (25)", format="%g"),
+                    "Total": st.column_config.ProgressColumn(
+                        "Total (50)", min_value=0, max_value=50, format="%g"),
+                },
+            )
 
     with tab_cards:
         for semester in get_semesters(selected_student_data):
@@ -1175,6 +1259,7 @@ if selected_student_data is not None and not selected_student_data.empty:
         complete_data.to_excel(writer, index=False, sheet_name="Academic Record")
         sem_df.to_excel(writer, index=False, sheet_name="Semester Summary")
         category_summary_df.to_excel(writer, index=False, sheet_name="Category Summary")
+        marks_student.to_excel(writer, index=False, sheet_name="In-Sem Marks")
     excel_buffer.seek(0)
 
     with export_col1:
@@ -1186,7 +1271,7 @@ if selected_student_data is not None and not selected_student_data.empty:
             use_container_width=True,
         )
 
-    pdf_buffer = generate_pdf(selected_student_data)
+    pdf_buffer = generate_pdf(selected_student_data, marks_student)
     with export_col2:
         st.download_button(
             "📄 Download PDF",
